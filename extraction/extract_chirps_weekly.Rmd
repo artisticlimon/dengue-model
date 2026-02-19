@@ -1,0 +1,49 @@
+```{r}
+library(lubridate)
+library(dplyr)
+```
+
+```{r}
+setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps")
+
+precip <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps/chirps_precip.csv")
+```
+```{r}
+precip$time = ymd(precip$time)
+```
+
+```{r}
+precip
+```
+
+
+```{r}
+precip_weekly <- precip |> 
+  mutate(year = year(time)) |> 
+  mutate(week1 = epiweek(time)) |>
+  group_by(week1, year, canton) |> 
+  summarise(precip_total = sum(precip),
+            precip_min = min(precip), 
+            precip_max = max(precip),
+            precip_mean = mean(precip),
+            precip_median = median(precip),
+    .groups = "drop" ) |> 
+  mutate(week = paste(year, week1, sep = "-"))
+```
+```{r}
+precip_weekly
+```
+
+
+```{r}
+precip_weekly <- precip_weekly[, -c(1, 2)]
+```
+```{r}
+write.csv(precip_weekly, file = "precip_weekly.csv")
+```
+
+
+
+
+
+
