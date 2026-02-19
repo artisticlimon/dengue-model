@@ -1,0 +1,86 @@
+```{r}
+library(lubridate)
+library(dplyr)
+```
+
+## Temp max
+
+```{r}
+setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirts/chirts_max")
+
+tmax <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirts/chirts_max/chirts_max.csv")
+```
+```{r}
+tmax$time = ymd(tmax$time)
+```
+
+```{r}
+precip
+```
+
+
+```{r}
+tmax_weekly <- tmax |> 
+  mutate(year = year(time)) |> 
+  mutate(week1 = epiweek(time)) |>
+  group_by(week1, year, canton) |> 
+  summarise(tmax_min = min(temp), 
+            tmax_max = max(temp),
+            tmax_mean = mean(temp),
+            tmax_median = median(temp),
+    .groups = "drop" ) |> 
+  mutate(week = paste(year, week1, sep = "-"))
+```
+```{r}
+tmax_weekly
+```
+
+
+```{r}
+tmax_weekly <- tmax_weekly[, -c(1, 2)]
+```
+```{r}
+write.csv(tmax_weekly, file = "tmax_weekly.csv")
+```
+
+## Temp min
+
+```{r}
+setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirts/chirts_min")
+
+tmin <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirts/chirts_min/chirts_min.csv")
+```
+```{r}
+tmin$time = ymd(tmin$time)
+```
+
+```{r}
+tmin_weekly <- tmin |> 
+  mutate(year = year(time)) |> 
+  mutate(week1 = epiweek(time)) |>
+  group_by(week1, year, canton) |> 
+  summarise(tmin_min = min(temp), 
+            tmin_max = max(temp),
+            tmin_mean = mean(temp),
+            tmin_median = median(temp),
+    .groups = "drop" ) |> 
+  mutate(week = paste(year, week1, sep = "-"))
+```
+```{r}
+tmin_weekly
+```
+
+
+```{r}
+tmin_weekly <- tmin_weekly[, -c(1, 2)]
+```
+```{r}
+write.csv(tmin_weekly, file = "tmin_weekly.csv")
+```
+
+
+
+
+
+
+
