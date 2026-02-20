@@ -15,9 +15,22 @@ tmax$time = ymd(tmax$time)
 ```
 
 ```{r}
-precip
+tmax
 ```
 
+```{r}
+tmax |> group_by(canton) |> 
+  summarise(nulos = sum(is.na(temp)), 
+            total_obs = n())
+```
+
+```{r}
+tmax |> group_by(canton, latitude, longitude) |> 
+  summarise(nulos = sum(is.na(temp)), 
+            total_obs = n(),
+            .groups = "drop") |> 
+  filter(nulos > 0)
+```
 
 ```{r}
 tmax_weekly <- tmax |> 
@@ -39,6 +52,12 @@ tmax_weekly
 ```{r}
 tmax_weekly <- tmax_weekly[, -c(1, 2)]
 ```
+
+```{r}
+tmax_weekly
+```
+
+
 ```{r}
 write.csv(tmax_weekly, file = "tmax_weekly.csv")
 ```
@@ -52,6 +71,20 @@ tmin <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuent
 ```
 ```{r}
 tmin$time = ymd(tmin$time)
+```
+
+```{r}
+tmin |> group_by(canton) |> 
+  summarise(nulos = sum(is.na(temp)), 
+            total_obs = n())
+```
+
+```{r}
+tmin |> group_by(canton, latitude, longitude) |> 
+  summarise(nulos = sum(is.na(temp)), 
+            total_obs = n(),
+            .groups = "drop") |> 
+  filter(nulos > 0)
 ```
 
 ```{r}

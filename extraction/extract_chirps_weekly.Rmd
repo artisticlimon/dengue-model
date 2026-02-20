@@ -8,12 +8,27 @@ setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr per
 
 precip <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps/chirps_precip.csv")
 ```
+
 ```{r}
 precip$time = ymd(precip$time)
 ```
 
 ```{r}
 precip
+```
+
+```{r}
+precip |> group_by(canton) |> 
+  summarise(nulos = sum(is.na(precip)), 
+            total_obs = n())
+```
+
+```{r}
+precip |> group_by(canton, longitude, latitude) |> 
+  summarise(nulos = sum(is.na(precip)), 
+            total_obs = n(),
+            .groups = "drop") |> 
+  filter(nulos > 0)
 ```
 
 
@@ -38,6 +53,12 @@ precip_weekly
 ```{r}
 precip_weekly <- precip_weekly[, -c(1, 2)]
 ```
+
+```{r}
+precip_weekly
+```
+
+
 ```{r}
 write.csv(precip_weekly, file = "precip_weekly.csv")
 ```
