@@ -1,0 +1,102 @@
+```{r}
+library(imputeTS)
+library(lubridate)
+library(dplyr)
+library(readxl)
+library(tidyr)
+```
+# Population
+
+```{r}
+pobs = read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/pob_anual.xlsx")
+```
+```{r}
+pobs_t = t(pobs)
+```
+
+```{r}
+pobs_t = data.frame(pobs_t)
+colnames(pobs_t) = pobs_t[1,1:ncol(pobs_t)]
+pobs_t = pobs_t[-c(1, 2, 11, 12, 13), 1:ncol(pobs_t)]
+```
+```{r}
+pobs_t["fecha"] <- c(ymd("2019-06-30"), ymd("2020-06-30"), ymd("2021-06-30"), ymd("2022-06-30"), ymd("2023-06-30"), ymd("2024-06-30"), ymd("2025-06-30"), ymd("2026-06-30"))
+```
+```{r}
+pobs_t
+```
+
+```{r}
+first_day = ymd("2019-06-30")
+last_day = ymd("2026-06-30")
+days = seq(first_day, last_day, by = "days")
+
+pob1 <- data.frame("fecha" = days)
+```
+
+```{r}
+pob <- left_join(pob1, pobs_t, by = "fecha")
+```
+
+```{r}
+pob
+```
+```{r}
+pob_int <- pob |> 
+  select(-fecha) |>  
+  apply(MARGIN = 2, FUN = as.numeric)|> 
+  apply(MARGIN = 2, FUN = na_interpolation)
+```
+
+```{r}
+pob_int <- as.data.frame(pob_int)
+pob_int
+```
+```{r}
+pob_int["fecha"] = pob["fecha"]
+```
+```{r}
+pob_int
+```
+```{r}
+weeks_date <- seq(first_day, last_day, by = "week")
+```
+
+```{r}
+pob_filter_weeks <- pob_int %>% 
+  filter(fecha %in% weeks_date) %>% 
+  select(1:ncol(pob_int))
+```
+
+```{r}
+pob_filter_weeks <- pob_filter_weeks |> 
+  mutate(year = year(fecha)) |> 
+  mutate(week1 = isoweek(fecha)) |> 
+  mutate(week = paste(year, week1, sep = "-")) |> 
+  select(-c(fecha, year, week1))
+```
+
+```{r}
+pob_filter_weeks
+```
+
+
+```{r}
+write.csv(pob_filter_weeks, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/pob_int_rr.csv")
+```
+
+```{r}
+pob_pivot = pivot_longer(pob_filter_weeks, cols = -c("week"), names_to = "code", values_to = "pob")
+pob_pivot <- pob_pivot |> 
+  mutate(week = paste(week, code, sep = "-")) |> 
+  select(week, pob)
+pob_pivot
+```
+```{r}
+write.csv(pob_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/pob_int.csv")
+```
+
+# El Niño
+
+
+
