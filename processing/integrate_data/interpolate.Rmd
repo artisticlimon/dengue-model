@@ -71,9 +71,14 @@ pob_filter_weeks <- pob_int %>%
 ```{r}
 pob_filter_weeks <- pob_filter_weeks |> 
   mutate(year = year(fecha)) |> 
+  filter(year %in% c(2020, 2021, 2022, 2023, 2024, 2025)) |> 
   mutate(week1 = isoweek(fecha)) |> 
   mutate(week = paste(year, week1, sep = "-")) |> 
   select(-c(fecha, year, week1))
+```
+
+```{r}
+pob_filter_weeks
 ```
 
 ```{r}
