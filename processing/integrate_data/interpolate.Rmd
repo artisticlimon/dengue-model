@@ -48,8 +48,8 @@ interpolate <- function(df_small, first_day, last_day) {
 canton_week <- function(df, var_name) {
   df_pivot = pivot_longer(df, cols = -c("week"), names_to = "code", values_to = var_name)
 df_pivot <- df_pivot |> 
-  mutate(week = paste(week, code, sep = "-")) |> 
-  select(week, pob)
+  mutate(week_canton = paste(week, code, sep = "-")) |> 
+  select(week_canton, var_name)
   return(df_pivot)
 }
 ```
@@ -70,6 +70,7 @@ pobs_t = data.frame(pobs_t)
 colnames(pobs_t) = pobs_t[1,1:ncol(pobs_t)]
 pobs_t = pobs_t[-c(1, 2, 11, 12, 13), 1:ncol(pobs_t)]
 ```
+
 ```{r}
 pobs_t["fecha"] <- c(ymd("2019-06-30"), ymd("2020-06-30"), ymd("2021-06-30"), ymd("2022-06-30"), ymd("2023-06-30"), ymd("2024-06-30"), ymd("2025-06-30"), ymd("2026-06-30"))
 ```
@@ -96,11 +97,33 @@ write.csv(pob_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta p
 # NDVI
 
 ```{r}
-baseNDVI <- read
+baseNDVI <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseNDVI.csv")
+baseNDVI <- baseNDVI |> 
+  mutate(fecha = ymd(fecha)) |> 
+  select(ndvi, fecha, ID)
+```
+
+```{r}
+baseNDVI_wide <- pivot_wider(baseNDVI, names_from = ID, values_from =  ndvi)
+```
+
+```{r}
+baseNDVI_wide
 ```
 
 
 
+```{r}
+baseNDVI_int <- interpolate(baseNDVI_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
+```
+
+```{r}
+baseNDVI_pivot <- canton_week(baseNDVI_int, var_name = "ndvi")
+```
+
+```{r}
+write.csv(baseNDVI_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/NDVI_int.csv")
+```
 
 # El Niño
 
