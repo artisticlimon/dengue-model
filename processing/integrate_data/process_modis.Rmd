@@ -20,7 +20,7 @@ baseNDVI_pre <- rbind(baseNDVI2020_full, baseNDVI2023_full)
 ```
 
 ```{r}
-baseNDVI_sites <- baseNDVI_epi |> 
+baseNDVI_sites <- baseNDVI_pre |> 
   select(site, value, calendar_date)
 ```
 
@@ -57,7 +57,8 @@ baseNDVI_sites <- baseNDVI_sites |>
 baseNDVI <- left_join(baseNDVI_sites, codes, by = "site1")
 
 baseNDVI <- baseNDVI |> 
-  select(c(value, calendar_date, ID))
+  mutate(fecha = ymd(calendar_date)) |> 
+  select(c(value, fecha, ID)) 
 ```
 
 ```{r}
