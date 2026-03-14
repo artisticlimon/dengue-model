@@ -74,17 +74,13 @@ pob_filter_weeks <- pob_filter_weeks |>
   filter(year %in% c(2020, 2021, 2022, 2023, 2024, 2025)) |> 
   mutate(week1 = isoweek(fecha)) |> 
   mutate(week = paste(year, week1, sep = "-")) |> 
+  filter(week != "2021-53") |> 
   select(-c(fecha, year, week1))
 ```
 
 ```{r}
 pob_filter_weeks
 ```
-
-```{r}
-pob_filter_weeks
-```
-
 
 ```{r}
 write.csv(pob_filter_weeks, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/pob_int_rr.csv")
