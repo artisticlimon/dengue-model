@@ -1,0 +1,72 @@
+```{r}
+library("dplyr")
+library("lubridate")
+library(readxl)
+```
+
+NDVI 
+
+```{r}
+load("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseNDVI2020_full.RData")
+
+load("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseNDVI2023_full.RData")
+```
+
+```{r}
+baseNDVI2020_full
+```
+```{r}
+baseNDVI_pre <- rbind(baseNDVI2020_full, baseNDVI2023_full)
+```
+
+```{r}
+baseNDVI_sites <- baseNDVI_epi |> 
+  select(site, value, calendar_date)
+```
+
+```{r}
+baseNDVI_sites
+```
+```{r}
+codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+
+codes <- codes |> 
+  select(ID, "PROVINCIA Y CANTON") |> 
+  filter(ID >= 101)
+
+colnames(codes) = c("ID", "site1")
+
+codesprueba <- codes[which(101 <= codes["ID"]), 1:ncol(codes)]
+```
+
+```{r}
+codes[11, "site1"] = "VAZQUEZ DE CORONADO"
+codes[20, "site1"] = "LEON CORTES CASTRO"
+codes[31, "site1"] = "ZARCERO"
+codes[32, "site1"] = "SARCHI"
+```
+
+
+```{r}
+baseNDVI_sites <- baseNDVI_sites |> 
+  mutate(site2 = toupper(site)) |> 
+  mutate(site1 = chartr("áéíóúñÁÉÍÓÚ", "aeiounAEIOU", site2))
+```
+
+```{r}
+baseNDVI <- left_join(baseNDVI_sites, codes, by = "site1")
+
+baseNDVI <- baseNDVI |> 
+  select(c(value, calendar_date, ID))
+```
+
+```{r}
+colnames(baseNDVI) <- c("ndvi", "fecha", "ID")
+```
+
+
+```{r}
+write.csv(baseNDVI, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseNDVI.csv")
+```
+
+
