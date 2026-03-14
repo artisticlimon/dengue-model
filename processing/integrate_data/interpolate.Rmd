@@ -4,7 +4,58 @@ library(lubridate)
 library(dplyr)
 library(readxl)
 library(tidyr)
+library(readr)
 ```
+# Functions
+
+```{r}
+interpolate <- function(df_small, first_day, last_day) {
+  
+  days = seq(first_day, last_day, by = "days")
+
+  df1 <- data.frame("fecha" = days)
+  
+  df <- left_join(df1, df_small, by = "fecha")
+
+  df_int <- df |> 
+  select(-fecha) |>  
+  apply(MARGIN = 2, FUN = as.numeric)|> 
+  apply(MARGIN = 2, FUN = na_interpolation)
+  
+  df_int <- as.data.frame(df_int)
+  
+  df_int["fecha"] = df1["fecha"]
+  
+  weeks_date <- seq(first_day, last_day, by = "week")
+  
+  df_filter_weeks <- df_int %>% 
+  filter(fecha %in% weeks_date) %>% 
+  select(1:ncol(df_int))
+  
+  df_filter_weeks <- df_filter_weeks |> 
+  mutate(year = year(fecha)) |> 
+  filter(year %in% c(2020, 2021, 2022, 2023, 2024, 2025)) |> 
+  mutate(week1 = isoweek(fecha)) |> 
+  mutate(week = paste(year, week1, sep = "-")) |> 
+  filter(week != "2021-53") |> 
+  select(-c(fecha, year, week1))
+  
+  return(df_filter_weeks)
+}
+```
+
+```{r}
+canton_week <- function(df, var_name) {
+  df_pivot = pivot_longer(df, cols = -c("week"), names_to = "code", values_to = var_name)
+df_pivot <- df_pivot |> 
+  mutate(week = paste(week, code, sep = "-")) |> 
+  select(week, pob)
+  return(df_pivot)
+}
+```
+
+
+
 # Population
 
 ```{r}
@@ -27,77 +78,79 @@ pobs_t
 ```
 
 ```{r}
-first_day = ymd("2019-06-30")
-last_day = ymd("2026-06-30")
-days = seq(first_day, last_day, by = "days")
-
-pob1 <- data.frame("fecha" = days)
+pob_int <- interpolate(pobs_t, ymd("2019-06-30"), ymd("2026-06-30"))
 ```
 
 ```{r}
-pob <- left_join(pob1, pobs_t, by = "fecha")
+write.csv(pob_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/pob_int_rr.csv")
 ```
 
 ```{r}
-pob
-```
-```{r}
-pob_int <- pob |> 
-  select(-fecha) |>  
-  apply(MARGIN = 2, FUN = as.numeric)|> 
-  apply(MARGIN = 2, FUN = na_interpolation)
+pob_pivot <- canton_week(pob_int, var_name = "pob")
 ```
 
-```{r}
-pob_int <- as.data.frame(pob_int)
-pob_int
-```
-```{r}
-pob_int["fecha"] = pob["fecha"]
-```
-```{r}
-pob_int
-```
-```{r}
-weeks_date <- seq(first_day, last_day, by = "week")
-```
-
-```{r}
-pob_filter_weeks <- pob_int %>% 
-  filter(fecha %in% weeks_date) %>% 
-  select(1:ncol(pob_int))
-```
-
-```{r}
-pob_filter_weeks <- pob_filter_weeks |> 
-  mutate(year = year(fecha)) |> 
-  filter(year %in% c(2020, 2021, 2022, 2023, 2024, 2025)) |> 
-  mutate(week1 = isoweek(fecha)) |> 
-  mutate(week = paste(year, week1, sep = "-")) |> 
-  filter(week != "2021-53") |> 
-  select(-c(fecha, year, week1))
-```
-
-```{r}
-pob_filter_weeks
-```
-
-```{r}
-write.csv(pob_filter_weeks, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/pob_int_rr.csv")
-```
-
-```{r}
-pob_pivot = pivot_longer(pob_filter_weeks, cols = -c("week"), names_to = "code", values_to = "pob")
-pob_pivot <- pob_pivot |> 
-  mutate(week = paste(week, code, sep = "-")) |> 
-  select(week, pob)
-pob_pivot
-```
 ```{r}
 write.csv(pob_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/pob_int.csv")
 ```
 
+# NDVI
+
+```{r}
+baseNDVI <- read
+```
+
+
+
+
 # El Niño
 
+## SST
 
+```{r}
+baseSST1 <-
+  read_table('https://www.cpc.ncep.noaa.gov/data/indices/ersst5.nino.mth.91-20.ascii')
+```
+```{r}
+baseSST1 <- baseSST1 |> 
+  filter(YR %in% seq(2020, 2025)) |> 
+  mutate(MON1 = case_when(MON == 1 ~ "01", 
+                          MON == 2 ~ "02", 
+                          MON == 3 ~ "03", 
+                          MON == 4 ~ "04",
+                          MON == 5 ~ "05",
+                          MON == 6 ~ "06", 
+                          MON == 7 ~ "07", 
+                          MON == 8 ~ "08",
+                          MON == 9 ~ "09",
+                          MON == 10 ~ "10", 
+                          MON == 11~ "11",
+                          MON == 12 ~ "12"))
+baseSST1 <- baseSST1 |> 
+  mutate(fecha1 = paste(YR, MON1, "15", sep = "-")) |> 
+  mutate(fecha = ymd(fecha1)) |> 
+  select(c(fecha, ANOM, ANOM_1, ANOM_2, ANOM_3))
+```
+
+```{r}
+baseSST_int <- interpolate(baseSST1, first_day = ymd("2020-01-01"), last_day =  ymd("2026-12-31"))
+```
+
+```{r}
+baseSST_int
+```
+
+
+
+## TNA
+
+```{r}
+datosTNA1 <-
+  read_table(
+    'https://www.esrl.noaa.gov/psd/data/correlation/tna.data'
+  )
+```
+
+```{r}
+
+```
 
