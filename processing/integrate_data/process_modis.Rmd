@@ -4,7 +4,7 @@ library("lubridate")
 library(readxl)
 ```
 
-NDVI 
+# NDVI 
 
 ```{r}
 load("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseNDVI2020_full.RData")
@@ -57,17 +57,74 @@ baseNDVI_sites <- baseNDVI_sites |>
 baseNDVI <- left_join(baseNDVI_sites, codes, by = "site1")
 
 baseNDVI <- baseNDVI |> 
-  mutate(fecha = ymd(calendar_date)) |> 
-  select(c(value, fecha, ID)) 
+  mutate(fecha = ymd(calendar_date)) |>
+  mutate(ndvi = value * 0.0001) |>
+  select(c(ndvi, fecha, ID)) 
 ```
-
-```{r}
-colnames(baseNDVI) <- c("ndvi", "fecha", "ID")
-```
-
 
 ```{r}
 write.csv(baseNDVI, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseNDVI.csv")
 ```
 
+# LST
 
+```{r}
+load("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseLST2020_full.RData")
+
+load("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseLST2023_full.RData")
+```
+
+```{r}
+baseLST2020_full
+```
+```{r}
+baseLST_pre <- rbind(baseLST2020_full, baseLST2023_full)
+```
+
+
+```{r}
+baseLST_sites <- baseLST_pre |> 
+  select(site, value, calendar_date)
+```
+
+```{r}
+baseLST_sites
+```
+```{r}
+codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+
+codes <- codes |> 
+  select(ID, "PROVINCIA Y CANTON") |> 
+  filter(ID >= 101)
+
+colnames(codes) = c("ID", "site1")
+
+codesprueba <- codes[which(101 <= codes["ID"]), 1:ncol(codes)]
+```
+
+```{r}
+codes[11, "site1"] = "VAZQUEZ DE CORONADO"
+codes[20, "site1"] = "LEON CORTES CASTRO"
+codes[31, "site1"] = "ZARCERO"
+codes[32, "site1"] = "SARCHI"
+```
+
+
+```{r}
+baseLST_sites <- baseLST_sites |> 
+  mutate(site2 = toupper(site)) |> 
+  mutate(site1 = chartr("áéíóúñÁÉÍÓÚ", "aeiounAEIOU", site2))
+```
+
+```{r}
+baseLST <- left_join(baseLST_sites, codes, by = "site1")
+
+baseLST <- baseLST |> 
+  mutate(fecha = ymd(calendar_date)) |> 
+  mutate(lst = (value * 0.02) - 273.15) |> 
+  select(c(lst, fecha, ID)) 
+```
+
+```{r}
+write.csv(baseLST, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseLST.csv")
+```
