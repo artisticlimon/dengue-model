@@ -54,8 +54,6 @@ df_pivot <- df_pivot |>
 }
 ```
 
-
-
 # Population
 
 ```{r}
@@ -125,6 +123,35 @@ baseNDVI_pivot <- canton_week(baseNDVI_int, var_name = "ndvi")
 write.csv(baseNDVI_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/NDVI_int.csv")
 ```
 
+# LST
+
+```{r}
+baseLST <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseLST.csv")
+baseLST <- baseLST |> 
+  mutate(fecha = ymd(fecha)) |> 
+  select(lst, fecha, ID)
+```
+
+```{r}
+baseLST_wide <- pivot_wider(baseLST, names_from = ID, values_from =  lst)
+```
+
+```{r}
+baseLST_wide
+```
+```{r}
+baseLST_int <- interpolate(baseLST_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
+```
+
+```{r}
+baseLST_pivot <- canton_week(baseLST_int, var_name = "lst")
+```
+
+```{r}
+write.csv(baseLST_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/LST_int.csv")
+```
+
+
 # El Niño
 
 ## SST
@@ -161,9 +188,6 @@ baseSST_int <- interpolate(baseSST1, first_day = ymd("2020-01-01"), last_day =  
 ```{r}
 baseSST_int
 ```
-
-
-
 ## TNA
 
 ```{r}
