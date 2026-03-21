@@ -49,3 +49,7 @@ baseNDVI2021_full <- mt_batch_subset(df = locations,
 save(baseNDVI2021_full, file = "baseNDVI2021_full.RData")
 ```
 
+# LST
+
+
+

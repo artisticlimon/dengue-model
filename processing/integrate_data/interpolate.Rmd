@@ -33,11 +33,16 @@ interpolate <- function(df_small, first_day, last_day) {
   select(1:ncol(df_int))
   
   df_filter_weeks <- df_filter_weeks |> 
-  mutate(year = year(fecha)) |> 
+  mutate(year = isoyear(fecha)) |> 
   filter(year %in% c(2020, 2021, 2022, 2023, 2024, 2025)) |> 
   mutate(week1 = isoweek(fecha)) |> 
   mutate(week = paste(year, week1, sep = "-")) |> 
   filter(week != "2021-53") |> 
+  filter(week != "2020-53") |> 
+  filter(week != "2022-53") |> 
+  filter(week != "2023-53") |>
+  filter(week != "2024-53") |>
+  filter(week != "2025-53") |> 
   select(-c(fecha, year, week1))
   
   return(df_filter_weeks)
@@ -112,7 +117,7 @@ baseNDVI_wide
 
 
 ```{r}
-baseNDVI_int <- interpolate(baseNDVI_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
+baseNDVI_int <- interpolate(baseNDVI_wide, first_day = ymd("2020-01-01"), last_day = ymd("2026-01-01"))
 ```
 
 ```{r}
@@ -178,7 +183,11 @@ baseSST1 <- baseSST1 |>
 baseSST1 <- baseSST1 |> 
   mutate(fecha1 = paste(YR, MON1, "15", sep = "-")) |> 
   mutate(fecha = ymd(fecha1)) |> 
-  select(c(fecha, ANOM, ANOM_1, ANOM_2, ANOM_3))
+  select(fecha = fecha,
+         nino12ssta = ANOM,
+         nino3ssta = ANOM_1,
+         nino4ssta = ANOM_2,
+         nino34ssta = ANOM_3)
 ```
 
 ```{r}
@@ -188,6 +197,68 @@ baseSST_int <- interpolate(baseSST1, first_day = ymd("2020-01-01"), last_day =  
 ```{r}
 baseSST_int
 ```
+
+```{r}
+nino12 <- baseSST_int |> 
+  select(week, nino12ssta)
+
+nino3 <- baseSST_int |> 
+  select(week, nino3ssta)
+
+nino4 <- baseSST_int |> 
+  select(week, nino4ssta)
+```
+
+```{r}
+codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+
+codes <- codes |> 
+  select(ID, "PROVINCIA Y CANTON") |> 
+  filter(ID >= 101)
+
+colnames(codes) = c("ID", "site1")
+
+cantones <- codes["ID"]
+
+cantones_vector <- cantones[[1]]
+
+cantones_vector = as.character(cantones_vector)
+```
+
+```{r}
+nino12[cantones_vector] <- nino12$nino12ssta
+
+nino12 <- nino12 |> 
+  select(-c(nino12ssta))
+
+nino3[cantones_vector] <- nino3$nino3ssta
+
+nino3 <- nino3 |> 
+  select(-c(nino3ssta))
+
+nino4[cantones_vector] <- nino4$nino4ssta
+
+nino4 <- nino4 |> 
+  select(-c(nino4ssta)) 
+```
+
+```{r}
+nino12_pivot <- canton_week(df = nino12, var_name = "nino12ssta") 
+
+nino3_pivot <- canton_week(df = nino3, var_name = "nino3ssta")
+
+nino4_pivot <- canton_week(df = nino4, var_name = "nino4ssta")
+```
+
+```{r}
+baseSST <- left_join(nino12_pivot, nino3_pivot, by = "week_canton")
+```
+
+```{r}
+write.csv(baseSST_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/SST_int.csv")
+```
+
+
 ## TNA
 
 ```{r}
@@ -198,6 +269,31 @@ datosTNA1 <-
 ```
 
 ```{r}
+baseSST1 <- baseSST1 |> 
+  filter(YR %in% seq(2020, 2025)) |> 
+  mutate(MON1 = case_when(MON == 1 ~ "01", 
+                          MON == 2 ~ "02", 
+                          MON == 3 ~ "03", 
+                          MON == 4 ~ "04",
+                          MON == 5 ~ "05",
+                          MON == 6 ~ "06", 
+                          MON == 7 ~ "07", 
+                          MON == 8 ~ "08",
+                          MON == 9 ~ "09",
+                          MON == 10 ~ "10", 
+                          MON == 11~ "11",
+                          MON == 12 ~ "12"))
+baseSST1 <- baseSST1 |> 
+  mutate(fecha1 = paste(YR, MON1, "15", sep = "-")) |> 
+  mutate(fecha = ymd(fecha1)) |> 
+  select(c(fecha, ANOM, ANOM_1, ANOM_2, ANOM_3))
+```
 
+```{r}
+baseSST_int <- interpolate(baseSST1, first_day = ymd("2020-01-01"), last_day =  ymd("2026-12-31"))
+```
+
+```{r}
+baseSST_int
 ```
 
