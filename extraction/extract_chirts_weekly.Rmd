@@ -1,6 +1,7 @@
 ```{r}
 library(lubridate)
 library(dplyr)
+library(readxl)
 ```
 
 ## Temp max
@@ -14,28 +15,11 @@ tmax <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuent
 tmax$time = ymd(tmax$time)
 ```
 
-```{r}
-tmax
-```
 
 ```{r}
-tmax |> group_by(canton) |> 
-  summarise(nulos = sum(is.na(temp)), 
-            total_obs = n())
-```
-
-```{r}
-tmax |> group_by(canton, latitude, longitude) |> 
-  summarise(nulos = sum(is.na(temp)), 
-            total_obs = n(),
-            .groups = "drop") |> 
-  filter(nulos > 0)
-```
-
-```{r}
-tmax_weekly <- tmax |> 
-  mutate(year = year(time)) |> 
-  mutate(week1 = epiweek(time)) |>
+tmax_weekly_site <- tmax |> 
+  mutate(year = isoyear(time)) |> 
+  mutate(week1 = isoweek(time)) |>
   group_by(week1, year, canton) |> 
   summarise(tmax_min = min(temp), 
             tmax_max = max(temp),
@@ -45,18 +29,47 @@ tmax_weekly <- tmax |>
   mutate(week = paste(year, week1, sep = "-"))
 ```
 ```{r}
-tmax_weekly
+tmax_weekly_site
 ```
 
 
 ```{r}
-tmax_weekly <- tmax_weekly[, -c(1, 2)]
+codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+
+codes <- codes |> 
+  select(ID, "PROVINCIA Y CANTON") |> 
+  filter(ID >= 101)
+
+colnames(codes) = c("ID", "site1")
+```
+
+```{r}
+codes[11, "site1"] = "VAZQUEZ DE CORONADO"
+codes[20, "site1"] = "LEON CORTES CASTRO"
+codes[31, "site1"] = "ZARCERO"
+codes[32, "site1"] = "SARCHI"
+```
+
+```{r}
+tmax_weekly_site <- tmax_weekly_site |> 
+  mutate(site2 = toupper(canton)) |> 
+  mutate(site1 = chartr("áéíóúñÁÉÍÓÚ", "aeiounAEIOU", site2))
+```
+
+```{r}
+tmax_weekly <- left_join(tmax_weekly_site, codes, by = "site1")
+```
+
+
+```{r}
+tmax_weekly <- tmax_weekly  |> 
+  mutate(week_canton = paste(week, ID, sep = "-")) |> 
+  select(-c(week1, year, week, canton, site1, site2, ID))
 ```
 
 ```{r}
 tmax_weekly
 ```
-
 
 ```{r}
 write.csv(tmax_weekly, file = "tmax_weekly.csv")
@@ -74,23 +87,9 @@ tmin$time = ymd(tmin$time)
 ```
 
 ```{r}
-tmin |> group_by(canton) |> 
-  summarise(nulos = sum(is.na(temp)), 
-            total_obs = n())
-```
-
-```{r}
-tmin |> group_by(canton, latitude, longitude) |> 
-  summarise(nulos = sum(is.na(temp)), 
-            total_obs = n(),
-            .groups = "drop") |> 
-  filter(nulos > 0)
-```
-
-```{r}
-tmin_weekly <- tmin |> 
-  mutate(year = year(time)) |> 
-  mutate(week1 = epiweek(time)) |>
+tmin_weekly_site <- tmin |> 
+  mutate(year = isoyear(time)) |> 
+  mutate(week1 = isoweek(time)) |>
   group_by(week1, year, canton) |> 
   summarise(tmin_min = min(temp), 
             tmin_max = max(temp),
@@ -100,12 +99,46 @@ tmin_weekly <- tmin |>
   mutate(week = paste(year, week1, sep = "-"))
 ```
 ```{r}
-tmin_weekly
+tmin_weekly_site
 ```
 
 
 ```{r}
-tmin_weekly <- tmin_weekly[, -c(1, 2)]
+codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+
+codes <- codes |> 
+  select(ID, "PROVINCIA Y CANTON") |> 
+  filter(ID >= 101)
+
+colnames(codes) = c("ID", "site1")
+```
+
+```{r}
+codes[11, "site1"] = "VAZQUEZ DE CORONADO"
+codes[20, "site1"] = "LEON CORTES CASTRO"
+codes[31, "site1"] = "ZARCERO"
+codes[32, "site1"] = "SARCHI"
+```
+
+```{r}
+tmin_weekly_site <- tmin_weekly_site |> 
+  mutate(site2 = toupper(canton)) |> 
+  mutate(site1 = chartr("áéíóúñÁÉÍÓÚ", "aeiounAEIOU", site2))
+```
+
+```{r}
+tmin_weekly <- left_join(tmin_weekly_site, codes, by = "site1")
+```
+
+
+```{r}
+tmin_weekly <- tmin_weekly  |> 
+  mutate(week_canton = paste(week, ID, sep = "-")) |> 
+  select(-c(week1, year, week, canton, site1, site2, ID))
+```
+
+```{r}
+tmin_weekly
 ```
 ```{r}
 write.csv(tmin_weekly, file = "tmin_weekly.csv")
