@@ -18,6 +18,7 @@ precip
 ```
 
 ```{r}
+# NO HAY DATOS DE GOLFITO
 precip |> group_by(canton) |> 
   summarise(nulos = sum(is.na(precip)), 
             total_obs = n())
@@ -33,9 +34,9 @@ precip |> group_by(canton, longitude, latitude) |>
 
 
 ```{r}
-precip_weekly <- precip |> 
-  mutate(year = year(time)) |> 
-  mutate(week1 = epiweek(time)) |>
+precip_weekly_site <- precip |> 
+  mutate(year = isoyear(time)) |> 
+  mutate(week1 = isoweek(time)) |>
   group_by(week1, year, canton) |> 
   summarise(precip_total = sum(precip),
             precip_min = min(precip), 
@@ -46,12 +47,41 @@ precip_weekly <- precip |>
   mutate(week = paste(year, week1, sep = "-"))
 ```
 ```{r}
-precip_weekly
+precip_weekly_site
+```
+```{r}
+codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+
+codes <- codes |> 
+  select(ID, "PROVINCIA Y CANTON") |> 
+  filter(ID >= 101)
+
+colnames(codes) = c("ID", "site1")
+```
+
+```{r}
+codes[11, "site1"] = "VAZQUEZ DE CORONADO"
+codes[20, "site1"] = "LEON CORTES CASTRO"
+codes[31, "site1"] = "ZARCERO"
+codes[32, "site1"] = "SARCHI"
 ```
 
 
 ```{r}
-precip_weekly <- precip_weekly[, -c(1, 2)]
+precip_weekly_site <- precip_weekly_site |> 
+  mutate(site2 = toupper(canton)) |> 
+  mutate(site1 = chartr("áéíóúñÁÉÍÓÚ", "aeiounAEIOU", site2))
+```
+
+```{r}
+precip_weekly <- left_join(precip_weekly_site, codes, by = "site1")
+```
+
+
+```{r}
+precip_weekly <- precip_weekly  |> 
+  mutate(week_canton = paste(week, ID, sep = "-")) |> 
+  select(-c(week1, year, week, canton, site1, site2, ID))
 ```
 
 ```{r}
