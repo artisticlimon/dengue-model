@@ -257,6 +257,7 @@ nino4_pivot <- canton_week(df = nino4, var_name = "nino4ssta")
 
 ```{r}
 baseSST <- left_join(nino12_pivot, nino3_pivot, by = "week_canton")
+baseSST_pivot <- left_join(baseSST, nino4_pivot, by = "week_canton")
 ```
 
 ```{r}
