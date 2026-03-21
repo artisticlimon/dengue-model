@@ -90,7 +90,12 @@ write.csv(pob_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta per
 ```
 
 ```{r}
-pob_pivot <- canton_week(pob_int, var_name = "pob")
+colnames(baseLST_int)
+```
+
+```{r}
+pob_int_0 <- pob_int |> select(-c("  0", "612", "613"))
+pob_pivot <- canton_week(pob_int_0, var_name = "pob")
 ```
 
 ```{r}
