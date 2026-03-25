@@ -61,12 +61,10 @@ Por otro lado, se verifica que no hay datos faltantes.
 ```{r}
 total_stats = data.frame("Medida"=c("Media", "Desviación estándar", "Mediana", "Primer cuartil", "Tercer cuartil"), "Valor"= c(round(mean(cases$"0"), 2), round(sd(cases$"0"), 2), round(quantile(cases$"0", probs = 0.5), 2), round(quantile(cases$"0", probs = 0.25), 2), round(quantile(cases$"0", probs = 0.75, 2))))
 
-kbl(total_stats, booktabs = T, align = "c", caption = "Medidas de resumen para el número total de casos", position = "h!") %>%
+kbl(total_stats, booktabs = T, align = "c", caption = "Medidas de resumen para el número total de casos semanales", position = "h!") %>%
   kable_styling(position = "center")
 ```
-En el Cuadro 2 se puede apreciar que la media del número de casos totales a nivel nacional es de 289. Sin embargo, la desviación estándar es muy alta, indicando que el número de casos son muy variables en los distintos cantones del país. 
-
-Las conclusiones obtenidas en el Cuadro 2 se ven validadas por el la Figura 1, en la que se puede ver una gran variabilidad en el número de casos según la provincia. Heredia presenta muy pocos casos, mientras que San José y Alajuela tienen reportes de casos altos. Además, parece haber muchas semanas con pocos casos, inclusive siendo cero. 
+En el Cuadro 2 se puede apreciar que la media del número de casos totales a nivel nacional es de 289. Sin embargo, la desviación estándar es muy alta, indicando que el número de casos son muy variables en los distintos cantones del país. Esto se debe a la variabilidad estacional, que se verá al graficar las series de tiempo.
 
 ```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución de los casos de dengue por provincia."}
 knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de los casos de dengue por provincia.png")
@@ -76,7 +74,7 @@ knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuent
 knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de los casos de dengue por cantón.png")
 ```
 
-Además de la gran cantidad de ceros, hay bastantes valores extremos, como se ve en la Figura 2. Por otro lado, en la Figura 3 hay cantones que presentan una cantidad de casos más alta que los demás de la provincia, como es el caso de los cantones de San José (101), Alajuela (201), Turrialba (305), Sarapiquí (410) y Puntarenas (601). Guanacaste y Limón presentan números de casos muy parecidos dentro de su misma provincia. En todos los provincias se ve que que hay una gran cantidad de valores extremos. Entonces, además de considerar la variabilidad espacial, es necesario usar técnicas para tratar tanto valores extremos como una alta cantidad de ceros.
+Además de la gran cantidad de ceros, que se ve en la Figura 1, hay bastantes valores extremos, como se ve en la Figura 2. Por otro lado, en la Figura 3 hay cantones que presentan una cantidad de casos más alta que los demás de la provincia, como es el caso de los cantones de San José (101), Alajuela (201), Turrialba (305), Sarapiquí (410) y Puntarenas (601). Guanacaste y Limón presentan números de casos muy parecidos dentro de su misma provincia. En todos los provincias se ve que que hay una gran cantidad de valores extremos. Entonces, además de considerar la variabilidad espacial, es necesario usar técnicas para tratar tanto valores extremos como una alta cantidad de ceros.
 
 
 ```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Serie de tiempo para los casos totales y por provincia de dengue en Costa Rica, 2020-2025."}
@@ -86,3 +84,6 @@ knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuent
 En la Figura 3, se puede apreciar que el número de casos parece ser cíclica con respecto al tiempo. También, hay picos muy altos en ciertos años, que indican epidemias.  Esto se ve muy marcado en la provincia de Guanacaste, mientras que en Cartago la serie parece bastante regular. En particular, a nivel nacional parece que hubo epidemias al final del 2023 y 2024. 
 
 Lo anterior no se cumplió en todas las provincias. En el 2023 hubo epidemias en Heredia, Guanacaste y Limón, mientras que en el 2024 sucedieron en San José y Cartago. Alajuela y Puntarenas presentaron epidemias en ambos años. Esto demuestra que el número de casos se comporta de manera muy diferente de acuerdo con la ubicación espacial. 
+
+
+
