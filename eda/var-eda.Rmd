@@ -85,5 +85,34 @@ En la Figura 3, se puede apreciar que el número de casos parece ser cíclica co
 
 Lo anterior no se cumplió en todas las provincias. En el 2023 hubo epidemias en Heredia, Guanacaste y Limón, mientras que en el 2024 sucedieron en San José y Cartago. Alajuela y Puntarenas presentaron epidemias en ambos años. Esto demuestra que el número de casos se comporta de manera muy diferente de acuerdo con la ubicación espacial. 
 
+# Población
+
+Fuente.
+
+Interpolación.
+
+INEC.
+
+```{r, fig.align='center', out.width='70%', out.height='80%', fig.cap="Serie de tiempo para la población total y según cantón más poblado, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Serie de tiempo para la población total y según cantón más poblado, 2020-2025.png")
+```
+
+```{r, fig.align='center', out.width='70%', out.height='80%', fig.cap="Distribución de la población por cantón."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Serie de tiempo para la población total y según cabecera de provincia, 2020-2025.png")
+```
+
+# Riesgo relativo
+
+Fórmula del riesgo relativo.
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución del riesgo relativo por cantón (datos completos)."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución del riesgo relativo por cantón (datos completos).png")
+```
+
+Borrar los ceros porque, como hay tantos, el umbral bajo es 0. 
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución del riesgo relativo por cantón (datos sin ceros)."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución del riesgo relativo por cantón (datos sin ceros).png")
+```
 
 
