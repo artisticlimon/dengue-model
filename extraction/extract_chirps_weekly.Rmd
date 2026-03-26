@@ -1,6 +1,7 @@
 ```{r}
 library(lubridate)
 library(dplyr)
+library(readxl)
 ```
 
 ```{r}
@@ -18,7 +19,6 @@ precip
 ```
 
 ```{r}
-# NO HAY DATOS DE GOLFITO
 precip |> group_by(canton) |> 
   summarise(nulos = sum(is.na(precip)), 
             total_obs = n())
@@ -44,7 +44,8 @@ precip_weekly_site <- precip |>
             precip_mean = mean(precip),
             precip_median = median(precip),
     .groups = "drop" ) |> 
-  mutate(week = paste(year, week1, sep = "-"))
+  mutate(week = paste(year, week1, sep = "-")) |> 
+  filter(!grepl("-53$", week))
 ```
 ```{r}
 precip_weekly_site
@@ -74,23 +75,67 @@ precip_weekly_site <- precip_weekly_site |>
 ```
 
 ```{r}
-precip_weekly <- left_join(precip_weekly_site, codes, by = "site1")
+precip_weekly <- left_join(precip_weekly_site, codes, by = "site1") |> 
+  select(-c(year, week1, canton, site1, site2))
+```
+
+```{r}
+precip_weekly # No hay datos a partir de la semana 41 del 2025
+```
+```{r}
+para_eda <- function(df, var) {
+  df_new <- df |> 
+    select(c(week, ID, var)) |>
+    pivot_wider(names_from = ID, values_from = var, id_cols = week)
+  write.csv(df_new, file = paste0("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/", var, "_eda.csv"))
+}
+```
+
+```{r}
+para_eda(precip_weekly, precip_total)
+
+para_eda(precip_weekly, precip_min)
+
+para_eda(precip_weekly, precip_max)
+
+para_eda(precip_weekly, precip_mean)
+
+para_eda(precip_weekly, precip_median)
+```
+
+
+```{r}
+write.csv(precip_total, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/precip_total_eda.csv")
+
+write.csv(precip_min, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/precip_min_eda.csv")
+
+write.csv(precip_max, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/precip_max_eda.csv")
+
+write.csv(precip_mean, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/precip_mean_eda.csv")
+
+write.csv(precip_median, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/precip_median_eda.csv")
 ```
 
 
 ```{r}
 precip_weekly <- precip_weekly  |> 
   mutate(week_canton = paste(week, ID, sep = "-")) |> 
-  select(-c(week1, year, week, canton, site1, site2, ID))
+  select(-c(ID, week))
+```
+```{r}
+precip$week
 ```
 
+```{r}
+52*6*82 - 24600
+```
 ```{r}
 precip_weekly
 ```
 
 
 ```{r}
-write.csv(precip_weekly, file = "precip_weekly.csv")
+write.csv(precip_weekly, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/precip_weekly.csv")
 ```
 
 
