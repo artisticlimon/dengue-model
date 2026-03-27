@@ -7,6 +7,8 @@ output:
       toc_float: true 
       collapsed: false 
 date: "2026-03-23"
+bibliography: "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/dengue-model.bib"
+csl: "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/apa.csl"
 header-includes:
   - \usepackage{booktabs}
   - \usepackage{longtable}
@@ -98,7 +100,7 @@ knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuent
 ```
 
 ```{r, fig.align='center', out.width='70%', out.height='80%', fig.cap="Distribución de la población por cantón."}
-knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Serie de tiempo para la población total y según cabecera de provincia, 2020-2025.png")
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de la población por cantón.png")
 ```
 
 # Riesgo relativo
@@ -109,10 +111,63 @@ Fórmula del riesgo relativo.
 knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución del riesgo relativo por cantón (datos completos).png")
 ```
 
-Borrar los ceros porque, como hay tantos, el umbral bajo es 0. 
+Borrar los ceros porque, como hay tantos, el umbral bajo es 0. PONER PERCENTAGE OF ZEROS.
+
+```{r}
+
+```
+
 
 ```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución del riesgo relativo por cantón (datos sin ceros)."}
 knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución del riesgo relativo por cantón (datos sin ceros).png")
 ```
 
+# Precipitación
 
+Para la precipitación, se extrajo la base de datos satelitales Climate Hazards Group InfraRed Precipitation with Station data (CHIRPS) de la Encuesta Geológica de los Estados Unidos (USGS, por sus siglas en inglés) y el Centro de Riesgos Climáticos (CHC, por sus siglas en inglés). Cuenta con datos desde 1981 en las latitudes 50°S-50°N y todas las longitudes. Además, presenta una resolución espacial de 0.05°. La base de datos extraída contiene el día, la latitud, longitud y el cantón de la medida, al igual que la cifra de interés, la cual es la precipitación total diaria (en milímetros) [@ucsbCHIRPSRainfall].
+
+Los datos fueron agregados a nivel semanal con precipitación total, máxima, mínima y su mediana. Al revisar la base de datos, se nota que no hay datos para Golfito ni a partir de la semana epidemiológica 41 del 2025. Por ende, estos datos se van a omitir por el momento.
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución de la precipitación total por cantón."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de la precipitación total por cantón.png")
+```
+
+Revisando primero la precipitación promedio (Figura ), se nota que las medianas para los distintos cantones dentro de una provincia son muy parecidas, al igual que su variabilidad. Sin embargo, hay bastantes valores extremos. Esto es debido a que la precipitación tiene variabilidad estacional, como se puede observar en la Figura.
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Serie de tiempo para la precipitación total y según cantón más lluvioso, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Serie de tiempo para la precipitación total y según cantón más lluvioso, 2020-2025.png")
+```
+
+La Figura muestra las series de tiempo para los cantones de mayor precipitación total en la provincia, ya que se ha encontrado que a mayor precipitación, más casos de dengue [@Ortega-Lenis2024-xu; @Cheng2021-eu; @Mena2011]. Estos cantones son Tarrazú (105), Río Cuarto (216), Paraíso (302), Sarapiquí (410), Hojancha (511), Quepos (606) y Siquirres (703). Muestra un claro patrón temporal, con los primeros meses del año siendo los menos lluviosos, contrariamente a los últimos del año. Se presentan picos de lluvias a finales del 2024. También se nota que hay semanas sin lluvia, como las primeras semanas de los años en Tarrazú, lo cual se ve confirmado por la Figura. Esta última muestra que hay muchas semanas donde la mitad de los días no presentan precipitación.
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Mediana de la precipitación semanal según cantón más lluvioso, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Mediana de la precipitación total según cantón más lluvioso, 2020-2025.png")
+```
+
+# Temperatura
+
+Datos de CHIRPS. 
+
+Datos de LST.
+
+Cómo fueron agregados los datos (CHIRTS y LST)
+
+No hay datos para Golfito ni a partir de la semana epidemiológica 41 del 2025 (CHIRTS).
+
+Se hicieron boxplots y se graficó los que cantones que tenían las temperaturas más altas (para tmax) y más bajas (tmin). Para LST se graficaron las que tenían el promedio más alto (lst_mean), porque temperaturas más altas indican más dengue.
+
+## Tmax
+
+## Tmin
+
+## LST
+
+# NDVI
+
+Se toma el del miércoles.
+
+# Nino
+
+Se toma el míercoles. Todos los mismos por mes para todo el país.
+
+# Referencias
