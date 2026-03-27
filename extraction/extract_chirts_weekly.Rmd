@@ -1,6 +1,7 @@
 ```{r}
 library(lubridate)
 library(dplyr)
+library(tidyr)
 library(readxl)
 ```
 
@@ -10,6 +11,8 @@ library(readxl)
 setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirts/chirts_max")
 
 tmax <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirts/chirts_max/chirts_max.csv")
+
+tmax = drop_na(tmax)
 ```
 ```{r}
 tmax$time = ymd(tmax$time)
@@ -18,15 +21,14 @@ tmax$time = ymd(tmax$time)
 
 ```{r}
 tmax_weekly_site <- tmax |> 
-  mutate(year = isoyear(time)) |> 
-  mutate(week1 = isoweek(time)) |>
-  group_by(week1, year, canton) |> 
+  group_by(canton, year = isoyear(time), week1 = isoweek(time)) |>
   summarise(tmax_min = min(temp), 
             tmax_max = max(temp),
             tmax_mean = mean(temp),
             tmax_median = median(temp),
-    .groups = "drop" ) |> 
-  mutate(week = paste(year, week1, sep = "-"))
+    .groups = "drop" )  |> 
+  mutate(week = paste(year, week1, sep = "-")) |> 
+  filter(!grepl("-53$", week))
 ```
 ```{r}
 tmax_weekly_site
@@ -57,14 +59,42 @@ tmax_weekly_site <- tmax_weekly_site |>
 ```
 
 ```{r}
-tmax_weekly <- left_join(tmax_weekly_site, codes, by = "site1")
+tmax_weekly <- left_join(tmax_weekly_site, codes, by = "site1") |> 
+  select(-c(year, week1, canton, site1, site2))
+```
+
+```{r}
+length(unique(tmax_weekly$week)) # Weeks missing: from # 40 in 2025
+```
+
+```{r}
+para_eda <- function(df, var) {
+  df_new <- df |> 
+    select(c(week, ID, var)) |>
+    pivot_wider(names_from = ID, values_from = var, id_cols = week)
+  write.csv(df_new, file = paste0("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/", var, "_eda.csv"))
+}
+```
+
+```{r}
+para_eda(tmax_weekly, "tmax_min")
+
+para_eda(tmax_weekly, "tmax_max")
+
+para_eda(tmax_weekly, "tmax_mean")
+
+para_eda(tmax_weekly, "tmax_median")
+```
+
+```{r}
+which(is.na(tmax_max$"112"))
 ```
 
 
 ```{r}
 tmax_weekly <- tmax_weekly  |> 
   mutate(week_canton = paste(week, ID, sep = "-")) |> 
-  select(-c(week1, year, week, canton, site1, site2, ID))
+  select(-c(ID, week))
 ```
 
 ```{r}
@@ -72,7 +102,7 @@ tmax_weekly
 ```
 
 ```{r}
-write.csv(tmax_weekly, file = "tmax_weekly.csv")
+write.csv(tmax_weekly, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/tmax_weekly.csv")
 ```
 
 ## Temp min
@@ -88,15 +118,14 @@ tmin$time = ymd(tmin$time)
 
 ```{r}
 tmin_weekly_site <- tmin |> 
-  mutate(year = isoyear(time)) |> 
-  mutate(week1 = isoweek(time)) |>
-  group_by(week1, year, canton) |> 
+  group_by(canton, year = isoyear(time), week1 = isoweek(time)) |> 
   summarise(tmin_min = min(temp), 
             tmin_max = max(temp),
             tmin_mean = mean(temp),
             tmin_median = median(temp),
     .groups = "drop" ) |> 
-  mutate(week = paste(year, week1, sep = "-"))
+  mutate(week = paste(year, week1, sep = "-")) |> 
+  filter(!grepl("-53$", week))
 ```
 ```{r}
 tmin_weekly_site
@@ -127,21 +156,46 @@ tmin_weekly_site <- tmin_weekly_site |>
 ```
 
 ```{r}
-tmin_weekly <- left_join(tmin_weekly_site, codes, by = "site1")
+tmin_weekly <- left_join(tmin_weekly_site, codes, by = "site1") |> 
+  select(-c(year, week1, canton, site1, site2))
 ```
 
 
 ```{r}
+para_eda <- function(df, var) {
+  df_new <- df |> 
+    select(c(week, ID, var)) |>
+    pivot_wider(names_from = ID, values_from = var, id_cols = week)
+  write.csv(df_new, file = paste0("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/", var, "_eda.csv"))
+}
+```
+
+```{r}
+tmin_weekly
+```
+
+
+```{r}
+para_eda(tmin_weekly, "tmin_min")
+
+para_eda(tmin_weekly, "tmin_max")
+
+para_eda(tmin_weekly, "tmin_mean")
+
+para_eda(tmin_weekly, "tmin_median")
+```
+
+```{r}
 tmin_weekly <- tmin_weekly  |> 
   mutate(week_canton = paste(week, ID, sep = "-")) |> 
-  select(-c(week1, year, week, canton, site1, site2, ID))
+  select(-c(ID, week))
 ```
 
 ```{r}
 tmin_weekly
 ```
 ```{r}
-write.csv(tmin_weekly, file = "tmin_weekly.csv")
+# write.csv(tmin_weekly, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/tmin_weekly.csv")
 ```
 
 
