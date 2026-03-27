@@ -47,6 +47,27 @@ interpolate <- function(df_small, first_day, last_day) {
   
   return(df_filter_weeks)
 }
+
+interpolate_days <- function(df_small, first_day, last_day) {
+  
+  days = seq(first_day, last_day, by = "days")
+
+  df1 <- data.frame("fecha" = days)
+  
+  df <- left_join(df1, df_small, by = "fecha")
+
+  df_int <- df |> 
+  select(-fecha) |>  
+  apply(MARGIN = 2, FUN = as.numeric)|> 
+  apply(MARGIN = 2, FUN = na_interpolation)
+  
+  df_int <- as.data.frame(df_int)
+  
+  df_int["fecha"] = df1["fecha"]
+  
+  return(df_int)
+}
+
 ```
 
 ```{r}
@@ -90,11 +111,10 @@ write.csv(pob_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta per
 ```
 
 ```{r}
-colnames(baseLST_int)
+pob_int_0 <- pob_int |> select(-c("  0", "612", "613"))
 ```
 
 ```{r}
-pob_int_0 <- pob_int |> select(-c("  0", "612", "613"))
 pob_pivot <- canton_week(pob_int_0, var_name = "pob")
 ```
 
@@ -119,10 +139,12 @@ baseNDVI_wide <- pivot_wider(baseNDVI, names_from = ID, values_from =  ndvi)
 baseNDVI_wide
 ```
 
-
+```{r}
+baseNDVI_int <- interpolate(baseNDVI_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
+```
 
 ```{r}
-baseNDVI_int <- interpolate(baseNDVI_wide, first_day = ymd("2020-01-01"), last_day = ymd("2026-01-01"))
+write.csv(baseNDVI_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/NDVI_eda.csv")
 ```
 
 ```{r}
@@ -150,15 +172,64 @@ baseLST_wide <- pivot_wider(baseLST, names_from = ID, values_from =  lst)
 baseLST_wide
 ```
 ```{r}
-baseLST_int <- interpolate(baseLST_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
+baseLST_int <- interpolate_days(baseLST_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
 ```
 
 ```{r}
-baseLST_pivot <- canton_week(baseLST_int, var_name = "lst")
+baseLST_int_long <- baseLST_int |>  pivot_longer(cols = -c("fecha"), names_to = "ID", values_to = "lst")
 ```
 
 ```{r}
-write.csv(baseLST_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/LST_int.csv")
+baseLST_int_long
+```
+
+```{r}
+lst_weekly_site <- baseLST_int_long |> 
+  group_by(ID, year = isoyear(fecha), week1 = isoweek(fecha)) |>
+  summarise(lst_min = min(lst), 
+            lst_max = max(lst),
+            lst_mean = mean(lst),
+            lst_median = median(lst),
+    .groups = "drop" )  |> 
+  mutate(week = paste(year, week1, sep = "-")) |> 
+  filter(!grepl("-53$", week))|> 
+  filter(!grepl("^2026", week))
+```
+```{r}
+lst_weekly_site
+```
+```{r}
+lst_weekly <- lst_weekly_site |> 
+  select(-c(year, week1))
+```
+
+```{r}
+para_eda <- function(df, var) {
+  df_new <- df |> 
+    select(c(week, ID, var)) |>
+    pivot_wider(names_from = ID, values_from = var, id_cols = week)
+  write.csv(df_new, file = paste0("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/", var, "_eda.csv"))
+}
+```
+
+```{r}
+para_eda(lst_weekly, "lst_min")
+
+para_eda(lst_weekly, "lst_max")
+
+para_eda(lst_weekly, "lst_mean")
+
+para_eda(lst_weekly, "lst_median")
+```
+
+```{r}
+lst_weekly <- lst_weekly  |> 
+  mutate(week_canton = paste(week, ID, sep = "-")) |> 
+  select(-c(ID, week))
+```
+
+```{r}
+write.csv(lst_weekly, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/LST_int.csv")
 ```
 
 
@@ -189,29 +260,15 @@ baseSST1 <- baseSST1 |>
   mutate(fecha1 = paste(YR, MON1, "15", sep = "-")) |> 
   mutate(fecha = ymd(fecha1)) |> 
   select(fecha = fecha,
-         nino12ssta = ANOM,
-         nino3ssta = ANOM_1,
-         nino4ssta = ANOM_2,
          nino34ssta = ANOM_3)
 ```
 
 ```{r}
-baseSST_int <- interpolate(baseSST1, first_day = ymd("2020-01-01"), last_day =  ymd("2026-12-31"))
+baseSST_int <- interpolate(baseSST1, first_day = ymd("2020-01-01"), last_day =  ymd("2025-12-31"))
 ```
 
 ```{r}
 baseSST_int
-```
-
-```{r}
-nino12 <- baseSST_int |> 
-  select(week, nino12ssta)
-
-nino3 <- baseSST_int |> 
-  select(week, nino3ssta)
-
-nino4 <- baseSST_int |> 
-  select(week, nino4ssta)
 ```
 
 ```{r}
@@ -231,33 +288,15 @@ cantones_vector = as.character(cantones_vector)
 ```
 
 ```{r}
-nino12[cantones_vector] <- nino12$nino12ssta
-
-nino12 <- nino12 |> 
-  select(-c(nino12ssta))
-
-nino3[cantones_vector] <- nino3$nino3ssta
-
-nino3 <- nino3 |> 
-  select(-c(nino3ssta))
-
-nino4[cantones_vector] <- nino4$nino4ssta
-
-nino4 <- nino4 |> 
-  select(-c(nino4ssta)) 
+baseSST_int[cantones_vector] <- baseSST_int$nino34ssta
 ```
 
 ```{r}
-nino12_pivot <- canton_week(df = nino12, var_name = "nino12ssta") 
-
-nino3_pivot <- canton_week(df = nino3, var_name = "nino3ssta")
-
-nino4_pivot <- canton_week(df = nino4, var_name = "nino4ssta")
+write.csv(baseSST_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/SST_eda.csv")
 ```
 
 ```{r}
-baseSST <- left_join(nino12_pivot, nino3_pivot, by = "week_canton")
-baseSST_pivot <- left_join(baseSST, nino4_pivot, by = "week_canton")
+baseSST_pivot <- canton_week(df = baseSST_int, var_name = "nino4ssta")
 ```
 
 ```{r}
