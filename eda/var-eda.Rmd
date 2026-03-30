@@ -138,7 +138,9 @@ Revisando primero la precipitación promedio (Figura ), se nota que las medianas
 knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Serie de tiempo para la precipitación total y según cantón más lluvioso, 2020-2025.png")
 ```
 
-La Figura muestra las series de tiempo para los cantones de mayor precipitación total en la provincia, ya que se ha encontrado que a mayor precipitación, más casos de dengue [@Ortega-Lenis2024-xu; @Cheng2021-eu; @Mena2011]. Estos cantones son Tarrazú (105), Río Cuarto (216), Paraíso (302), Sarapiquí (410), Hojancha (511), Quepos (606) y Siquirres (703). Muestra un claro patrón temporal, con los primeros meses del año siendo los menos lluviosos, contrariamente a los últimos del año. Se presentan picos de lluvias a finales del 2024. También se nota que hay semanas sin lluvia, como las primeras semanas de los años en Tarrazú, lo cual se ve confirmado por la Figura. Esta última muestra que hay muchas semanas donde la mitad de los días no presentan precipitación.
+La Figura muestra las series de tiempo para los cantones de mayor precipitación total en la provincia, ya que se ha encontrado que a mayor precipitación, más casos de dengue [@Ortega-Lenis2024-xu; @Cheng2021-eu; @Mena2011]. Estos cantones son Tarrazú (105), Río Cuarto (216), Paraíso (302), Sarapiquí (410), Hojancha (511), Quepos (606) y Siquirres (703). Se aprecia que Tarrazú es poco lluvioso, mientras que los cantones de las otras provincias presentan precipitaciones totales bastante parecidas.
+
+La precipitación total muestra un claro patrón temporal (Figura ), con los primeros meses del año siendo los menos lluviosos, contrariamente a los últimos del año. Se presentan picos de lluvias a finales del 2024. También se nota que hay semanas sin lluvia, como las primeras semanas de los años en Tarrazú, lo cual se ve confirmado por la Figura. Esta última muestra que hay muchas semanas donde la mitad de los días no presentan precipitación.
 
 ```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Mediana de la precipitación semanal según cantón más lluvioso, 2020-2025."}
 knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Mediana de la precipitación total según cantón más lluvioso, 2020-2025.png")
@@ -146,19 +148,52 @@ knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuent
 
 # Temperatura
 
-Datos de CHIRPS. 
+El primer tipo de datos son los máximos y los mínimos de temperatura diaria, provenientes de la base de datos diaria del Climate Hazards Center Infrared Temperature with Stations (CHIRTS-daily, o simplemente CHIRTS). Presenta datos entre las longitudes 60°S – 70°N, con una resolución de 0.05° x 0.05° (aproximadamente 5km) [@ucsbCHIRTSdailyClimate].
 
-Datos de LST.
+Los datos de temperaturas máximas y mínimas se extrajeron de la base de datos diaria del Climate Hazards Center Infrared Temperature with Stations (CHIRTS-daily, o simplemente CHIRTS). Presenta datos entre las longitudes 60°S – 70°N, con una resolución de 0.05° x 0.05° (aproximadamente 5km). Esta base consta de la fecha, la latitud, la longitud, el cantón y la temperatura [@ucsbCHIRTSdailyClimate]. 
 
-Cómo fueron agregados los datos (CHIRTS y LST)
+Los datos de la Temperatura de la Superficie Terrestre (LST, por sus siglas en inglés) se extrajeron del Moderate Resolution Imaging Spectroradiometer (MODIS) de la Administración Nacional de Aeronáutica y el Espacio (NASA, por sus siglas en inglés). Se encuentra dentro de dos satélites (Terra y Aqua). Cuenta con una resolución espacial de 1km y los datos se toman cada 8 días, por lo cual fue necesario hacer una interpolación lineal semanal [@MODISabout; @MODISspecifications; @LSTSpecifications]. 
 
-No hay datos para Golfito ni a partir de la semana epidemiológica 41 del 2025 (CHIRTS).
+La agregación semanal consiste de los máximos, mínimos, promedios y medianas de cada variable. No hay datos para Golfito (ni en LST ni en CHIRTS) ni a partir de la semana epidemiológica 41 del 2025 (para CHIRTS).
 
-Se hicieron boxplots y se graficó los que cantones que tenían las temperaturas más altas (para tmax) y más bajas (tmin). Para LST se graficaron las que tenían el promedio más alto (lst_mean), porque temperaturas más altas indican más dengue.
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución de la temperatura máxima máxima por cantón."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de la temperatura máxima máxima por cantón.png")
+```
 
-## Tmax
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución de la temperatura mínima mínima por cantón."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de la temperatura mínima por cantón.png")
+```
 
-## Tmin
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución de la precipitación total por cantón."}
+# knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de la precipitación total por cantón.png")
+```
+
+Se hicieron boxplots (Figuras ) y se graficó los que cantones que tenían las temperaturas más altas (para tmax) y más bajas (tmin). Por otro lado, para LST se graficaron las que tenían el promedio más alto (lst_mean), porque temperaturas más altas indican una mayor incidencia de dengue dengue [@Ortega-Lenis2024; @Mena2011] Estos se pueden ver en el Cuadro . 
+
+```{r}
+cantones_y_temperaturas <- data.frame("Provincia" = c("San José", "Alajuela", "Cartago", "Heredia", "Guanacaste", "Puntarenas", "Limón"), "Máxima" = c("Turrubares (116)", "Los Chiles (214)", "Turrialba (305)", "Sarapiquí (410)", "Carrillo (505)", "Corredores (610)", "Pococí (702)"),"Mínima" = c("Vázquez de Coronado (111)", "Sarchí (212)", "El Guarco (308)", "Heredia (401)", "Tilarán (508)", "Coto Brus (608)", "Limón (701)"), "Mayor promedio" = c("LLENAR", "LLENAR", "LLENAR", "LLENAR", "LLENAR", "LLENAR", "LLENAR"))
+  
+kbl(cantones_y_temperaturas, booktabs = T, align = "c", caption = "Cantones según extremos de temperatura según provincia, 2020-2025", position = "h!") %>%
+  kable_styling(position = "center")
+```
+
+## Temperatura máxima
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Serie de tiempo para la temperatura máxima máxima y según cantón más caliente 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/
+Serie de tiempo para la temperatura máxima máxima y según cantón más caliente 2020-2025.png")
+```
+
+La Figura muestra una clara estacionalidad en la temperatura máxima, con temperaturas más altas en el segundo cuatrimestre del año y las menores a finales del año. Turrialba muestra las temperaturas más bajas (entre 24-30°C), mientras que Los Chiles, Corredores y Carrilllo presentan las más altas (entre 30-39°C). Este último cantón muestra el mayor rango de temperatura, mientras que Sarapiquí y Pococí presentan variaciones pequeñas durante el año. 
+
+## Temperatura mínima
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Serie de tiempo para la temperatura mínima mínima y según cantón más frío 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/
+Serie de tiempo para la temperatura mínima mínima y según cantón más frío 2020-2025.png")
+```
+
+Las temperaturas mínimas mínimas de los cantones del Gran Área Metropolitana (GAM) son bastante similares, mientras que en las costas Guanacaste presenta las mayores temperaturas mínimas (entre 18-24°C) (Figura ). También se ve una clara estacionalidad, con rangos bastante parecidos entre los cantones de las distintas provincias.    
 
 ## LST
 
