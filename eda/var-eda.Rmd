@@ -103,22 +103,23 @@ En la Figura se ve que en todos los cantones la población es bastante constante
 
 # Riesgo relativo
 
-Fórmula del riesgo relativo.
+El riesgo relativo es una medida que relaciona los casos de cada cantón con los casos totales, tomando en cuenta la población. Se calcula de la siguiente forma [@Barboza2023]:
+
+$$
+RR_{i, \ t} = \dfrac{\frac{\text{Casos}_{i, \ t}}{\text{Población}_{i, \ t}}}{\frac{\text{Casos}_{\text{CR}, \ t}}{\text{Población}_{\text{CR}, \ t}}}
+$$
 
 ```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución del riesgo relativo por cantón (datos completos)."}
 knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución del riesgo relativo por cantón (datos completos).png")
 ```
 
-Borrar los ceros porque, como hay tantos, el umbral bajo es 0. PONER PERCENTAGE OF ZEROS.
-
-```{r}
-
-```
-
+El porcentaje de semanas y cantones donde el riesgo relativo es 0 (es decir, que no hay casos) es de 60%, por lo que, los umbrales para definir las categorías de riesgo bajo, medio y alto son muy pequeños. Para que sea más realista, se eliminan los ceros al calcular los umbrales y se obtienen los resultados de la Figura .
 
 ```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución del riesgo relativo por cantón (datos sin ceros)."}
 knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución del riesgo relativo por cantón (datos sin ceros).png")
 ```
+
+Se observa que las provincias donde hay riesgos relativos más altos son Cartago (Turrialba), Heredia (Sarapiquí) y Limón (Siquirres, Talamanca y Guácimo). Los otros cantones presentan riesgos relativos en su mayoría bajos y medios, aunque con algunos valores extremos debidos a la variación temporal en el número de casos. 
 
 # Precipitación
 
@@ -196,6 +197,7 @@ Las temperaturas mínimas mínimas de los cantones del Gran Área Metropolitana 
 ## LST
 
 # NDVI
+
 
 Se toma el del miércoles.
 

@@ -55,6 +55,12 @@ ggplot(cant_pob_long) +
 
 ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Población de los distintos cantones de Costa Rica, 2020-2025.png)")
 ```
+# Relative risk
+
+```{r}
+rr <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\relative_risk.csv)")
+```
+
 
 # Urbanization
 ```{r}
