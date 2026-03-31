@@ -89,19 +89,17 @@ Lo anterior no se cumplió en todas las provincias. En el 2023 hubo epidemias en
 
 # Población
 
-Fuente.
+Los datos de la población provienen del Instituto Nacional de Estadística y Censos (INEC) y se recolectaron para calcular el riesgo relativo de dengue. Estos archivos contienen las proyecciones anuales (al 30 de junio) del 2000-2050 por cantón, usando como base el Censo del 2000 [@proyeccionesINEC]. Como solo hay datos para un día del año, y el comportamiento del aumento era bastante lineal (Figura ), se hizo una interpolación lineal para obtener proyecciones por día.
 
-Interpolación.
-
-INEC.
-
-```{r, fig.align='center', out.width='70%', out.height='80%', fig.cap="Serie de tiempo para la población total y según cantón más poblado, 2020-2025."}
-knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Serie de tiempo para la población total y según cantón más poblado, 2020-2025.png")
+```{r, fig.align='center', out.width='60%', out.height='50%', fig.cap="Crecimiento de la población total de Costa Rica (proyecciones al 30 de junio), 2019-2026."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Crecimiento de la población total de Costa Rica (proyecciones al 30 de junio), 2019-2026.png")
 ```
 
-```{r, fig.align='center', out.width='70%', out.height='80%', fig.cap="Distribución de la población por cantón."}
-knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de la población por cantón.png")
+```{r, fig.align='center', out.width='60%', out.height='50%', fig.cap="Población de los distintos cantones de Costa Rica, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Población de los distintos cantones de Costa Rica, 2020-2025.png")
 ```
+
+En la Figura se ve que en todos los cantones la población es bastante constante. Además, la región más poblaba está en el centro del país, en la provincia de San José. Las costas y las fronteras tienen a tener una población menor.
 
 # Riesgo relativo
 
@@ -204,5 +202,20 @@ Se toma el del miércoles.
 # Nino
 
 Se toma el míercoles. Todos los mismos por mes para todo el país.
+
+# Grado de Urbanidad
+
+El grado de urbanidad se obtuvo de la Comisión Económica para América Latina y el Caribe (CEPAL) y corresponde a datos del 2022. Esta clasifica cada cantón en urbano, rural-urbano y rural [@Samper2022]. En el Cuadro se puede ver el número de cantones y el porcentaje de cada clasificación. 
+
+```{r}
+urb1 <- data.frame("Grado de Urbanidad" = c("Rural", "Rural-Urbano", "Urbano"), "Máxima" = c(22, 29, 31), "Porcentaje" = c(26.83, 35.37, 37.80))
+  
+kbl(urb1, booktabs = T, align = "c", caption = "Número y porcentaje de cantones en cada grado de urbanidad, 2022", position = "h!") %>%
+  kable_styling(position = "center")
+```
+
+MAPA CON CADA CATEGORÍA
+
+# Google Trends
 
 # Referencias
