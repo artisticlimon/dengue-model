@@ -214,7 +214,12 @@ kbl(urb1, booktabs = T, align = "c", caption = "Número y porcentaje de cantones
   kable_styling(position = "center")
 ```
 
-MAPA CON CADA CATEGORÍA
+```{r, fig.align='center', out.width='60%', out.height='40%', fig.cap="Grado de urbanización de los cantones de Costa Rica, 2022."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/
+Grado de urbanización de los cantones de Costa Rica, 2022.png")
+```
+
+A partir de la Figura se determina que los cantones urbanos están concentrados en el centro del país, mientras que en la costa del Caribe hay mayoritariamente cantones rurales. Los cantones de grado rural-urbano están distribuidos en las demás zonas del país. Parece además que los cantones con menos extensión tienden a ser urbanos. Entonces, aunque la mayoría de los cantones en el país son urbanos (Cuadro ), esto no significa que esta categoría tenga la mayor extensión territorial.
 
 # Google Trends
 

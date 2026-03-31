@@ -1,0 +1,119 @@
+```{r}
+library(dplyr)
+library(readxl)
+library(sf)
+library(ggplot2)
+library(tidyr)
+library(scales)
+```
+
+# Population
+
+
+```{r}
+cantones <- st_read(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\canton-shapes\UGEC_MGN_2022.shp)")
+
+cantones <- st_transform(cantones, 4326)
+
+pob <- read_excel(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\pob_anual.xlsx)")
+
+cantones$NOMB_UGEC[60] = "CAÑAS"
+
+colnames(cantones)[which(colnames(cantones) == "COD_UGEC")] = "codigo"
+
+cantones$codigo = as.numeric(cantones$codigo)
+
+cant_pob <- left_join(cantones, pob, by = "codigo") |> 
+  filter(!codigo %in% c(612, 613)) |> 
+  select(c(codigo, geometry, "2020", "2021", "2022", "2023", "2024", "2025")) 
+
+cant_pob_long <- pivot_longer(cant_pob, cols = c("2020", "2021", "2022", "2023", "2024", "2025"), names_to = "year", values_to = "pob")
+```
+
+```{r}
+ggplot(cant_pob_long) +
+  geom_sf(aes(fill = pob)) +
+  facet_wrap(~year, nrow = 3, ncol = 2) +
+  coord_sf(
+    xlim = c(-86, -80),   
+    ylim = c(8,  11.4),   
+    expand = FALSE
+  ) +
+  scale_fill_gradient(low = "white", high = "darkred", name = "Población", labels = comma) + 
+  theme_void() +                                        
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.border = element_blank(),
+    legend.position = "right"                           
+  )
+
+ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Población de los distintos cantones de Costa Rica, 2020-2025.png)")
+```
+
+# Urbanization
+```{r}
+urb <- read_excel(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\grado_de_urbanidad.xlsx)")
+```
+
+```{r}
+urb$URBANIZACION = as.factor(urb$URBANIZACION)
+urb |> 
+  group_by(URBANIZACION) |> 
+  summarise(conteo = n()) |> 
+  mutate(porcentaje = round(100 * conteo / sum(conteo), 2))
+```
+```{r}
+urb <- read_excel(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\grado_de_urbanidad.xlsx)")
+
+colnames(urb)[which(colnames(urb) == "ID")] = "codigo"
+```
+
+```{r}
+cantones <- st_read(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\canton-shapes\UGEC_MGN_2022.shp)")
+
+colnames(cantones)[which(colnames(cantones) == "COD_UGEC")] = "codigo"
+
+cantones$codigo = as.numeric(cantones$codigo)
+
+cantones <- st_transform(cantones, 4326)
+```
+```{r}
+cant_urb <- left_join(cantones, urb, by = "codigo") |> 
+  filter(!codigo %in% c(612, 613)) |> 
+  select(c(codigo, geometry, URBANIZACION)) 
+```
+
+
+```{r}
+ggplot(cant_urb) +
+  geom_sf(aes(fill = URBANIZACION)) +
+  coord_sf(
+    xlim = c(-86, -82),   
+    ylim = c(8,  11.4), 
+    expand = FALSE
+  ) +
+  scale_fill_discrete(name = "Grado de urbanización") +
+  theme_void() +                                        
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.border = element_blank(),
+    legend.position = "right"                           
+  )
+
+ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Grado de urbanización de los cantones de Costa Rica, 2022.png)")
+```
+
+
+
