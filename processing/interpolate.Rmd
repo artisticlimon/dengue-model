@@ -2,6 +2,7 @@
 library(imputeTS)
 library(lubridate)
 library(dplyr)
+library(purrr)
 library(readxl)
 library(tidyr)
 library(readr)
@@ -48,26 +49,73 @@ interpolate <- function(df_small, first_day, last_day) {
   return(df_filter_weeks)
 }
 
-interpolate_days <- function(df_small, first_day, last_day) {
+interpolate_ndvi <- function(df_small, first_day, last_day) {
   
   days = seq(first_day, last_day, by = "days")
 
-  df1 <- data.frame("fecha" = days)
+  df1  <- tibble(fecha = days)
   
   df <- left_join(df1, df_small, by = "fecha")
 
-  df_int <- df |> 
-  select(-fecha) |>  
-  apply(MARGIN = 2, FUN = as.numeric)|> 
-  apply(MARGIN = 2, FUN = na_interpolation)
+  num_cols <- setdiff(names(df), "fecha")
+  X <- as.matrix(df[num_cols])
+
+  X_imp <- matrix(nrow = nrow(X), ncol = ncol(X))
+  colnames(X_imp) <- num_cols
+
+  for (j in seq_len(ncol(X))) {
+    x_ts <- ts(X[, j], frequency = 365)
+    X_imp[, j] <- na_seadec(x_ts, algorithm = "interpolation")
+  }
+
+  df_int <- as_tibble(X_imp, .names = num_cols) |>
+    bind_cols(fecha = df$fecha)
+   weeks_date <- seq(first_day, last_day, by = "week")
   
-  df_int <- as.data.frame(df_int)
+  df_filter_weeks <- df_int %>% 
+  filter(fecha %in% weeks_date) %>% 
+  select(1:ncol(df_int))
   
-  df_int["fecha"] = df1["fecha"]
+  df_filter_weeks <- df_filter_weeks |> 
+  mutate(year = isoyear(fecha)) |> 
+  filter(year %in% c(2020, 2021, 2022, 2023, 2024, 2025)) |> 
+  mutate(week1 = isoweek(fecha)) |> 
+  mutate(week = paste(year, week1, sep = "-")) |> 
+  filter(week != "2021-53") |> 
+  filter(week != "2020-53") |> 
+  filter(week != "2022-53") |> 
+  filter(week != "2023-53") |>
+  filter(week != "2024-53") |>
+  filter(week != "2025-53") |> 
+  select(-c(fecha, year, week1))
+  
+  return(df_filter_weeks)
+}
+
+interpolate_lst <- function(df_small, first_day, last_day) {
+  
+  days = seq(first_day, last_day, by = "days")
+
+  df1  <- tibble(fecha = days)
+  
+  df <- left_join(df1, df_small, by = "fecha")
+
+  num_cols <- setdiff(names(df), "fecha")
+  X <- as.matrix(df[num_cols])
+
+  X_imp <- matrix(nrow = nrow(X), ncol = ncol(X))
+  colnames(X_imp) <- num_cols
+
+  for (j in seq_len(ncol(X))) {
+    x_ts <- ts(X[, j], frequency = 365)
+    X_imp[, j] <- na_seadec(x_ts, algorithm = "interpolation")
+  }
+
+  df_int <- as_tibble(X_imp, .names = num_cols) |>
+    bind_cols(fecha = df$fecha)
   
   return(df_int)
 }
-
 ```
 
 ```{r}
@@ -140,7 +188,7 @@ baseNDVI_wide
 ```
 
 ```{r}
-baseNDVI_int <- interpolate(baseNDVI_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
+baseNDVI_int <- interpolate_ndvi(baseNDVI_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
 ```
 
 ```{r}
@@ -160,19 +208,24 @@ write.csv(baseNDVI_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cue
 ```{r}
 baseLST <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseLST.csv")
 baseLST <- baseLST |> 
-  mutate(fecha = ymd(fecha)) |> 
-  select(lst, fecha, ID)
+  mutate(fecha = ymd(fecha)) |>
+  mutate(lst1 = case_when(
+  lst < 0 ~ NA,
+  TRUE ~ lst  
+)) |> 
+  select(lst1, fecha, ID) 
 ```
 
 ```{r}
-baseLST_wide <- pivot_wider(baseLST, names_from = ID, values_from =  lst)
+baseLST_wide <- pivot_wider(baseLST, names_from = ID, values_from =  lst1) 
 ```
 
 ```{r}
-baseLST_wide
+baseLST_wide <-baseLST_wide |> 
+  select(-c("607"))
 ```
 ```{r}
-baseLST_int <- interpolate_days(baseLST_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
+baseLST_int <- interpolate_lst(baseLST_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
 ```
 
 ```{r}
