@@ -322,7 +322,11 @@ baseSST1 <- baseSST1 |>
 ```
 
 ```{r}
-baseSST_int <- interpolate(baseSST1, first_day = ymd("2020-01-01"), last_day =  ymd("2025-12-31"))
+write.csv(baseSST1, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/SST_eda.csv")
+```
+
+```{r}
+baseSST_int <- interpolate_ndvi(baseSST1, first_day = ymd("2020-01-01"), last_day =  ymd("2025-12-31"))
 ```
 
 ```{r}
@@ -350,7 +354,7 @@ baseSST_int[cantones_vector] <- baseSST_int$nino34ssta
 ```
 
 ```{r}
-write.csv(baseSST_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/SST_eda.csv")
+write.csv(baseSST_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/SST_int_eda.csv")
 ```
 
 ```{r}
