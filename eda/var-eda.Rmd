@@ -222,7 +222,16 @@ En la Figura se muestra la variación en el tiempo del NDVI de los cantones con 
 
 # Nino
 
-Se toma el míercoles. Todos los mismos por mes para todo el país.
+Para medir el fenómeno de El Niño-Oscilación Sur (ENSO, por sus siglas en inglés), se usó el índice de Anomalía de la Temperatura Superficial del Mar (SSTA, por sus siglas en inglés) Niño 3.4. Estas cifras semanales se obtuvieron del Centro de Predicción Climática de la Climate Prediction Center (CPC) de Estados Unidos [@Elninodatos]. 
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Comportamiento del SST mensual en Costa Rica, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/
+Comportamiento del SST mensual en Costa Rica, 2020-2025.png")
+```
+
+Como solo se cuenta con datos mensuales, se hace una interpolación para que la granularidad sea diaria. Esto se hace tomando en cuenta la no-linealidad del fenómeno (Figura). Semanalmente, toma el míercoles. Además, todos los cantones tienen el mismo SST, ya que los datos son a nivel nacional.
+
+En la Figura se puede apreciar cierta ciclidad en las mediciones mensuales, con picos pronunciados. Hay un pico negativo a finales del 2020, mientras que a finales del 2024 hay un poco muy alto. Esto último coincide con los datos de temperatura y precipitación, que indican anomalías en esta época.
 
 # Grado de Urbanidad
 
