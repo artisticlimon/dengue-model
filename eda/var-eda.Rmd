@@ -89,7 +89,7 @@ Lo anterior no se cumplió en todas las provincias. En el 2023 hubo epidemias en
 
 # Población
 
-Los datos de la población provienen del Instituto Nacional de Estadística y Censos (INEC) y se recolectaron para calcular el riesgo relativo de dengue. Estos archivos contienen las proyecciones anuales (al 30 de junio) del 2000-2050 por cantón, usando como base el Censo del 2000 [@proyeccionesINEC]. Como solo hay datos para un día del año, y el comportamiento del aumento era bastante lineal (Figura ), se hizo una interpolación lineal para obtener proyecciones por día.
+Los datos de la población provienen del Instituto Nacional de Estadística y Censos (INEC) y se recolectaron para calcular el riesgo relativo de dengue. Estos archivos contienen las proyecciones anuales (al 30 de junio) del 2000-2050 por cantón, usando como base el Censo del 2000 [@proyeccionesINEC]. Como solo hay datos para un día del año, y el comportamiento del aumento era bastante lineal (Figura ), se hizo una interpolación lineal para obtener proyecciones por día. Se toma la población cada miércoles.
 
 ```{r, fig.align='center', out.width='60%', out.height='50%', fig.cap="Crecimiento de la población total de Costa Rica (proyecciones al 30 de junio), 2019-2026."}
 knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Crecimiento de la población total de Costa Rica (proyecciones al 30 de junio), 2019-2026.png")
@@ -198,8 +198,27 @@ Las temperaturas mínimas mínimas de los cantones del Gran Área Metropolitana 
 
 # NDVI
 
+Los datos del Índice de Vegetación de Diferencia Normalizada (NDVI, por sus siglas en inglés) se extrajeron del MODIS, al igual que la LST. Los datos tienen una resolución espacial de 250m y, como se toman cada 16 días, se realizó una interpolación tomando en cuenta la estacionalidad (Figura ) para que se tuvieran los datos a nivel semanal. Se toma el NDVI del miércoles, y tampoco hay datos para el cantón de Golfito.
 
-Se toma el del miércoles.
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Comportamiento del NDVI en el cantón central de San José, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/
+Comportamiento del NDVI en el cantón central de San José, 2020-2025.png")
+```
+
+La distribución del NDVI en las distintas provincias es bastante variable, y la varianza es diferente entre los cantones dentro de una misma provincia. A continuación se muestra la imagen de los cantones con mayor NDVI de cada provincia. 
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución del NDVI según cantón, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/
+Distribución del NDVI según cantón, 2020-2025.png")
+```
+
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="CSeries de tiempo según cantón de la provincia con mayor NDVI, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/
+Series de tiempo según cantón de la provincia con mayor NDVI, 2020-2025.png")
+```
+
+En la Figura se muestra la variación en el tiempo del NDVI de los cantones con mayor valor de ese índice. Estos cantones son Dota (117), Alajuela (201), El Guarco (308), Heredia (401), Tilarán (508), Corredores (610) y Limón (701). Se aprecia que la mayoría presenta una gran variabilidad en el tiempo, con picos pronunciados. Una excepción a esto son los cantones de Alajuela y Corredores, que se mantienen bastante estables, exceptuando algunos picos. El NDVI está en rangos bastante similares a través de los cantones graficados.
 
 # Nino
 

@@ -59,6 +59,11 @@ ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr 
 
 ```{r}
 rr <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\relative_risk.csv)")
+
+rr_0 <- rr |> 
+  filter(rr == 0)
+
+round(nrow(rr_0) / nrow(rr), 2)
 ```
 
 
