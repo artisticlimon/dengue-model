@@ -175,12 +175,17 @@ write.csv(pob_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta p
 ```{r}
 baseNDVI <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseNDVI.csv")
 baseNDVI <- baseNDVI |> 
-  mutate(fecha = ymd(fecha)) |> 
-  select(ndvi, fecha, ID)
+  mutate(fecha = ymd(fecha)) |>
+  mutate(ndvi1 = case_when(
+  ndvi < 0 ~ NA,
+  TRUE ~ ndvi  
+)) |> 
+  select(ndvi = ndvi1, fecha, ID)
 ```
 
 ```{r}
-baseNDVI_wide <- pivot_wider(baseNDVI, names_from = ID, values_from =  ndvi)
+baseNDVI_wide <- pivot_wider(baseNDVI, names_from = ID, values_from =  ndvi) |> 
+  select(-c("607"))
 ```
 
 ```{r}
@@ -188,7 +193,7 @@ baseNDVI_wide
 ```
 
 ```{r}
-baseNDVI_int <- interpolate_ndvi(baseNDVI_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
+baseNDVI_int <- interpolate_ndvi(baseNDVI_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31")) 
 ```
 
 ```{r}
@@ -196,7 +201,7 @@ write.csv(baseNDVI_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuent
 ```
 
 ```{r}
-baseNDVI_pivot <- canton_week(baseNDVI_int, var_name = "ndvi")
+baseNDVI_pivot <- canton_week(baseNDVI_int, var_name = "ndvi") 
 ```
 
 ```{r}
