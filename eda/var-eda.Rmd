@@ -198,7 +198,9 @@ Las temperaturas mínimas mínimas de los cantones del Gran Área Metropolitana 
 
 # NDVI
 
-Los datos del Índice de Vegetación de Diferencia Normalizada (NDVI, por sus siglas en inglés) se extrajeron del MODIS, al igual que la LST. Los datos tienen una resolución espacial de 250m y, como se toman cada 16 días, se realizó una interpolación tomando en cuenta la estacionalidad (Figura ) para que se tuvieran los datos a nivel semanal. Se toma el NDVI del miércoles, y tampoco hay datos para el cantón de Golfito.
+Los datos del Índice de Vegetación de Diferencia Normalizada (NDVI, por sus siglas en inglés) se extrajeron del MODIS, al igual que la LST. Este índice se utiliza para medir la "salud" de la vegetación analizando su color, el cual indica la cantidad de clorofila presente en las plantas. Los valores van de -1 a 1. Entre más alto el valor, más saludable la vegetación [@NASANDVI].
+
+Los datos tienen una resolución espacial de 250m y, como se toman cada 16 días, se realizó una interpolación tomando en cuenta la estacionalidad (Figura ) para que se tuvieran los datos a nivel semanal. Se toma el NDVI del miércoles, y tampoco hay datos para el cantón de Golfito. 
 
 ```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Comportamiento del NDVI en el cantón central de San José, 2020-2025."}
 knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/
@@ -222,7 +224,7 @@ En la Figura se muestra la variación en el tiempo del NDVI de los cantones con 
 
 # Nino
 
-Para medir el fenómeno de El Niño-Oscilación Sur (ENSO, por sus siglas en inglés), se usó el índice de Anomalía de la Temperatura Superficial del Mar (SSTA, por sus siglas en inglés) Niño 3.4. Estas cifras semanales se obtuvieron del Centro de Predicción Climática de la Climate Prediction Center (CPC) de Estados Unidos [@Elninodatos]. 
+Para medir el fenómeno de El Niño-Oscilación Sur (ENSO, por sus siglas en inglés), se usó el índice de Anomalía de la Temperatura Superficial del Mar (SSTA, por sus siglas en inglés) Niño 3.4. Este índice se calcula como el promedio de las anomalías en la temperatura superficial del mar, utilizando una ventana de cinco meses [@Nino34Info]. Estas cifras semanales se obtuvieron del Centro de Predicción Climática de la Climate Prediction Center (CPC) de Estados Unidos [@Elninodatos]. 
 
 ```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Comportamiento del SST mensual en Costa Rica, 2020-2025."}
 knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/
@@ -252,5 +254,42 @@ Grado de urbanización de los cantones de Costa Rica, 2022.png")
 A partir de la Figura se determina que los cantones urbanos están concentrados en el centro del país, mientras que en la costa del Caribe hay mayoritariamente cantones rurales. Los cantones de grado rural-urbano están distribuidos en las demás zonas del país. Parece además que los cantones con menos extensión tienden a ser urbanos. Entonces, aunque la mayoría de los cantones en el país son urbanos (Cuadro ), esto no significa que esta categoría tenga la mayor extensión territorial.
 
 # Google Trends
+
+Los datos de Google Trends se obtuvieron de su API. Los datos son a nivel de provincia, por lo que se tomó el mismo valor para todos los cantones de esa provincia. Estos datos corresponden al interés de búsqueda, que son la razón entre el número de búsquedas de esa frase y el número total de búsquedas en Google en ese periodo y lugar, que después se escalan en un rango de 0 a 100 [@GoogleTrendsDetails]. Además, como los datos son diarios, se tomó el dato del miércoles de cada semana. 
+
+Se seleccionaron frases y se agruparon según su temática. Esto se puede ver en el Cuadro.
+
+```{r}
+frases_busqueda <- data.frame("Frase" = c("aedes aegypti", "criaderos de mosquito", "fiebre", "plaquetas", "buscar trabajo", "desempleo", "empleo", "comprar carro", "préstamo", "tiquetes avion", "vacaciones", "corte agua", "corte de agua", "suspension de agua"), "Categoria" = c("Propagación del dengue", "Propagación del dengue", "Propagación del dengue", "Propagación del dengue", "Empleo", "Empleo", "Empleo", "Mobilidad financiera", "Mobilidad y finanzas", "Mobilidad y finanzas", "Mobilidad y finanzas", "Agua", "Agua", "Agua"))
+  
+kbl(frases_busqueda, booktabs = T, align = "c", caption = "Frases de búsqueda y su categoría temática", position = "h!") %>%
+  kable_styling(position = "center")
+```
+
+Para analizar las categorías, se tomó el valor máximo de la frase con la tendencia más alta. En la Figura se puede ver que el interés de búsqueda de empleo es cíclico a nivel nacional (picos a principio de trimestre) en las provincias centrales, con este grupo siendo el que tiene más interés de búsqueda. El interés de búsqueda de propagación del dengue también es cíclico a nivel nacional, pero hay muy poco en las provincias, siendo San José y Alajuela las que tienen más interés de búsqueda en esta categoría. En San José, Alajuela y Heredia se ve más claramente el comportamiento cíclico del interés de búsqueda de movilidad y finanzas. Por otro lado, el interés de búsqueda sobre agua presentan un comportamiento muy irregular, ya que son 0 en su mayoría, pero con picos en algunas cuantas semanas.
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Comportamiento del interés de búsqueda a través del tipo según provincia y categoría.png."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/
+Comportamiento del interés de búsqueda a través del tipo según provincia y categoría.png")
+```
+
+Hay una diferencia notoria entre las costas y las provincias centrales, ya que en estas primeras hay una alta cantidad de ceros en todas la categorías (Figura). Sin embargo, sí tienen algunos picos en todas las categorías. El porcentaje de ceros se puede ver en el Cuadro y confirma que las provincias con más porcentajes de ceros en todas las provincias son las costeras. En este mismo cuadro se puede apreciar que la categoría con menos ceros es la de empleo, siendo este porcentaje muy bajo en San José (1.6%) y en Alajuela (24.68%).
+
+```{r}
+load(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\tables\trends_groups_ceros.Rdata)")
+  
+kbl(ceros_groups_wide, booktabs = T, align = "c", caption = "Porcentaje de ceros para cada provincia según característica de la búsqueda.", position = "h!") %>%
+  kable_styling(position = "center")
+```
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Comportamiento del interés de búsqueda a través del tipo según provincia y frase.png."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/
+Comportamiento del interés de búsqueda a través del tipo según provincia y frase.png")
+```
+
+Al realizar el mismo análisis de comportamiento para cada frase, se nota un comportamiento parecido a las categorías (Figura). La frase *empleo* es la más popular, con frases de propagación del dengue como *aedes aegypti* y *fiebre* siendo también populares. El patrón cíciclo se mantiene. Sigue habiendo una gran cantidad de ceros en las costas, con algunos picos.
+
+# Campañas
+
+Datos se recolectaron de la red social X, usando la función de búsqueda en la cuenta del Ministerio de Salud. La palabra clave de la búsqueda fue *dengue*.
 
 # Referencias

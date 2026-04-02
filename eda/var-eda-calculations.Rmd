@@ -66,7 +66,6 @@ rr_0 <- rr |>
 round(nrow(rr_0) / nrow(rr), 2)
 ```
 
-
 # Urbanization
 ```{r}
 urb <- read_excel(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\grado_de_urbanidad.xlsx)")
@@ -126,5 +125,49 @@ ggplot(cant_urb) +
 ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Grado de urbanización de los cantones de Costa Rica, 2022.png)")
 ```
 
+# Trends
+
+## Group
+
+```{r}
+trends_group <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_group_eda.csv)")
+```
+
+```{r}
+ceros_groups <- trends_group |> 
+  filter(province != 0) |> 
+  mutate(categoria = case_when(group == "dengue_spread" ~ "Propagación del dengue",
+                                 group == "employment" ~ "Empleo",
+                                 group == "mobility_finance" ~ "Mobilidad financiera", 
+                                 group == "water" ~ "Agua")) |> 
+  mutate(provincia = case_when(province == 1 ~ "1San José", 
+                               province == 2 ~ "2Alajuela",
+                               province == 3 ~ "3Cartago",
+                               province == 4 ~ "4Heredia", 
+                               province == 5 ~ "5Guanacaste", 
+                               province == 6 ~ "6Puntarenas", 
+                               province == 7 ~ "7Limón")) |> 
+  group_by(categoria, provincia) |> 
+  filter(value == 0) |> 
+  summarise(ceros = round(100 * n() / 312, 2), 
+            .groups = "keep")
+
+ceros_groups_wide <- pivot_wider(ceros_groups, id_cols = "categoria", names_from = "provincia", values_from = "ceros")
+
+
+colnames(ceros_groups_wide) <- c("Categoría","San José", "Alajuela", "Cartago", "Heredia", "Guanacaste", "Puntarenas", "Limón")
+ceros_groups_wide
+
+save(ceros_groups_wide, file = r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\tables\trends_groups_ceros.Rdata)")
+```
+
+```{r}
+trends_group_grouped |> 
+  left_join(trends_group_zeros, by = c(group, province)) |> 
+  mutate(porcentaje = round(100 * ceros / total))
+```
+
+
+## Keywords
 
 

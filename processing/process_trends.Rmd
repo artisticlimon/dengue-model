@@ -1,0 +1,175 @@
+```{r}
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(readxl)
+```
+```{r}
+trends_raw <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_normalized_daily.csv)")
+```
+
+```{r}
+trends_raw$date <- ymd(trends_raw$date)
+```
+
+```{r}
+unique(trends_raw$region_name)
+```
+```{r}
+unique(trends_raw$keyword)
+```
+```{r}
+trends_full <- trends_raw |> 
+  mutate(province = case_when(
+    region_name == "national" ~ 0,  
+    region_name == "alajuela" ~ 2,  
+    region_name == "cartago" ~ 3,    
+    region_name =="guanacaste" ~ 5, 
+    region_name == "heredia" ~ 4,   
+    region_name == "limon" ~ 7, 
+    region_name == "puntarenas" ~ 6,
+    region_name == "san_jose" ~ 1
+  )) |> 
+  select(-c(region, province = region_name))
+```
+
+# Groups 
+
+```{r}
+trends_group <- trends_full |> 
+  select(-c(keyword)) |> 
+  group_by(date, group, province) 
+```
+
+
+```{r}
+
+weeks_date <- seq(ymd("2020-01-01"), ymd("2025-12-31"), by = "week")
+  
+trends_group_weeks <- trends_group |> 
+  filter(date %in% weeks_date) |> 
+  mutate(year = isoyear(date)) |> 
+  filter(year %in% 2020:2025) |> 
+  mutate(week1 = isoweek(date)) |> 
+  mutate(week = paste(year, week1, sep = "-")) |> 
+  filter(!week %in% c("2020-53","2021-53","2022-53","2023-53","2024-53","2025-53")) |> 
+  select(-c(year, week1))
+
+trends_group_weeks <- trends_group_weeks |>
+  group_by(week, province, group) |>
+  summarise(value = max(value, na.rm = TRUE), .groups = "drop")
+```
+
+```{r}
+write.csv(trends_group_weeks, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_group_eda.csv)")
+```
+
+
+```{r}
+codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+
+codes <- codes |> 
+  select(ID) |> 
+  filter(ID >= 101)
+```
+```{r}
+mapping_cantons <- codes |> 
+  mutate(province = case_when(
+    startsWith(as.character(ID), "1") ~ 1,
+    startsWith(as.character(ID), "2") ~ 2,
+    startsWith(as.character(ID), "3") ~ 3,
+    startsWith(as.character(ID), "4") ~ 4,
+    startsWith(as.character(ID), "5") ~ 5,
+    startsWith(as.character(ID), "6") ~ 6,
+    startsWith(as.character(ID), "7") ~ 7
+  ))
+
+trends_group_canton <- trends_group_weeks |> 
+  filter(province != 0) |> 
+  left_join(mapping_cantons %>% select(province, ID), 
+            by = "province", 
+    relationship = "many-to-many") |> 
+  select(province, group, week, ID, everything())
+```
+
+```{r}
+trends_group_pairs <- trends_group_canton |>
+  mutate(week_canton = paste(week, ID, sep = "-")) |> 
+  select(-c(ID, week, province))
+
+trends_group_wide <- pivot_wider(trends_group_pairs, id_cols = week_canton, names_from = group, values_from = value)
+```
+
+```{r}
+write.csv(trends_group_pairs, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_group.csv)")
+```
+
+# Keywords
+
+```{r}
+weeks_date <- seq(ymd("2020-01-01"), ymd("2025-12-31"), by = "week")
+  
+trends_key_weeks <- trends_full |> 
+  select(-c(group)) |> 
+  filter(date %in% weeks_date) 
+  
+trends_key_weeks <- trends_key_weeks |> 
+mutate(year = isoyear(date)) |> 
+filter(year %in% c(2020, 2021, 2022, 2023, 2024, 2025)) |> 
+mutate(week1 = isoweek(date)) |> 
+mutate(week = paste(year, week1, sep = "-")) |> 
+filter(week != "2021-53") |> 
+filter(week != "2020-53") |> 
+filter(week != "2022-53") |> 
+filter(week != "2023-53") |>
+filter(week != "2024-53") |>
+filter(week != "2025-53") |> 
+select(-c(date, year, week1))
+```
+
+```{r}
+write.csv(trends_key_weeks, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_key_eda.csv)")
+```
+
+```{r}
+codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+
+codes <- codes |> 
+  select(ID) |> 
+  filter(ID >= 101)
+```
+```{r}
+mapping_cantons <- codes |> 
+  mutate(province = case_when(
+    startsWith(as.character(ID), "1") ~ 1,
+    startsWith(as.character(ID), "2") ~ 2,
+    startsWith(as.character(ID), "3") ~ 3,
+    startsWith(as.character(ID), "4") ~ 4,
+    startsWith(as.character(ID), "5") ~ 5,
+    startsWith(as.character(ID), "6") ~ 6,
+    startsWith(as.character(ID), "7") ~ 7
+  ))
+
+trends_key_canton <- trends_key_weeks |> 
+  filter(province != 0) |> 
+  left_join(mapping_cantons %>% select(province, ID), 
+            by = "province", 
+            relationship = "many-to-many") |> 
+  select(province, keyword, week, ID, everything())
+```
+
+
+```{r}
+trends_key_pairs <- trends_key_canton |>
+  mutate(week_canton = paste(week, ID, sep = "-")) |> 
+  select(-c(ID, week, province))
+
+trends_key_wide <- pivot_wider(trends_key_pairs, names_from = keyword, values_from = value)
+```
+
+```{r}
+write.csv(trends_key_pairs, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)")
+```
+
+
+
