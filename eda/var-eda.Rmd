@@ -290,6 +290,25 @@ Al realizar el mismo análisis de comportamiento para cada frase, se nota un com
 
 # Campañas
 
-Datos se recolectaron de la red social X, usando la función de búsqueda en la cuenta del Ministerio de Salud. La palabra clave de la búsqueda fue *dengue*.
+Los datos de las campañas se recolectaron de la red social X, usando la función de búsqueda en la cuenta del Ministerio de Salud. La palabra clave de la búsqueda fue *dengue*. También se recolectaron de noticias en línea.
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Cantones con campañas de prevención (todo tipo), 2020-2025.png."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Cantones con campañas de prevención (todo tipo), 2020-2025.png")
+```
+
+En la Figura se muestra que las campañas estuvieron repartidas a través del territorio nacional, sin notar un patrón espacial. Sin embargo, en muchos cantones no hubo intervenciones. A través de estos años, hubo campañas solamente en el 28.6% de los cantones.
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Porcentaje de días en los que se realizó cada tipo de campaña.png."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Porcentaje de días en los que se realizó cada tipo de campaña.png")
+```
+
+De las intervenciones realizadas, las más comunes fueron las fumigaciones, las cuales corresponden la mitad de los días en los cuales hubo intervención (Figura ). Hubo bastantes tipos con menos del 1% de los días, como las campañas de educación, eliminación de criaderos, entre otras.
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Meses con campañas de prevención (todo tipo), 2020-2025.png."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Meses con campañas de prevención (todo tipo), 2020-2025.png")
+```
+
+En la Figura se ve que no se encontraron campañas en el 2020 ni en el 2021. Estas se concentran en su mayor parte a partir del 2023, con una alta concentración en la segunda mitad del 2025.
 
 # Referencias
+

@@ -166,8 +166,96 @@ trends_group_grouped |>
   left_join(trends_group_zeros, by = c(group, province)) |> 
   mutate(porcentaje = round(100 * ceros / total))
 ```
+## Campaigns
 
+```{r}
+campa <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/campaigns_eda.csv")
+```
 
-## Keywords
+```{r}
+cantones <- st_read(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\canton-shapes\UGEC_MGN_2022.shp)")
+
+cantones <- st_transform(cantones, 4326)
+
+cantones$NOMB_UGEC[60] = "CAÑAS"
+
+colnames(cantones)[which(colnames(cantones) == "COD_UGEC")] = "codigo"
+```
+
+```{r}
+campa_map <- cantones |> 
+  select(codigo, geometry)
+
+campa_map <- campa_map |> 
+  mutate(presencia = case_when(codigo %in% as.character(campa$ID) ~ 1,
+                               TRUE ~ 0))
+```
+
+```{r}
+ggplot(campa_map) +
+  geom_sf(aes(fill = factor(presencia))) +
+  coord_sf(
+    xlim = c(-86, -82),   
+    ylim = c(8,  11.4), 
+    expand = FALSE
+  ) +
+  theme_void() +
+  scale_fill_manual(
+    values = c("0" = "gray80", "1" = "darkblue"),
+    labels = c("0" = "Sin campañas", "1" = "Con campañas"),
+    name = "Campañas"
+  ) +
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.border = element_blank(),
+    legend.position = "right"                           
+  )
+
+ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Cantones con campañas de prevención (todo tipo), 2020-2025.png)")
+```
+```{r}
+campa_cal <- data.frame("annio" = rep(2020:2025, each = 12), "mes1" = rep(1:12, 6)) |> 
+  mutate(mes_num = case_when(mes1 == 1 ~ "01",
+                             mes1 == 2 ~ "02",
+                             mes1 == 3 ~ "03", 
+                             mes1 == 4 ~ "04",
+                             mes1 == 5 ~ "05",
+                             mes1 == 6 ~ "06",
+                             mes1 == 7 ~ "07",
+                             mes1 == 8 ~ "08",
+                             mes1 == 9 ~ "09",
+                             mes1 == 10 ~ "10",
+                             mes1 == 11 ~ "11",
+                             mes1 == 12 ~ "12")) |> 
+  mutate(mes_annio = paste(annio, mes_num, sep = "-")) |> 
+  mutate(presencia = case_when(mes_annio %in% as.character(campa$mes_annio) ~ 1,
+                               TRUE ~ 0))
+
+campa_cal$presencia = factor(campa_cal$presencia)
+
+```
+
+```{r}
+ggplot(campa_cal, aes(x = factor(mes1), y = factor(annio), fill = presencia)) +
+  geom_tile(color = "black", linewidth = 0.5) +   
+  scale_fill_manual(
+    values = c("0" = "gray80", "1" = "darkblue"),
+    labels = c("0" = "Sin campañas", "1" = "Con campañas"),
+    name = "Campañas"
+  ) +
+  scale_y_discrete(limits = rev) + 
+  theme_minimal() +
+  labs(x = "Mes", y = "Año") +
+  theme(panel.grid = element_blank())
+
+ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Meses con campañas de prevención (todo tipo), 2020-2025.png)", width = 10, height = 6, units = "in")
+```
+
 
 
