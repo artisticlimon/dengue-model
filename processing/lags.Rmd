@@ -1,0 +1,103 @@
+```{r}
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+# Functions 
+
+```{r}
+separate_canton <- function(df, var) {
+  df_long <- df |> 
+  mutate(canton = str_extract(week.canton, "[^-]+$")) |> 
+  mutate(week = str_extract(week.canton, "^[^-]*-[^-]*")) |> 
+  select(-week.canton) |> 
+  pivot_wider(id_cols = week, names_from = canton, values_from = var)
+}
+
+lags <- function(df, n, var){
+  df_lag= df
+  for (i in 1:length(colnames(df))) {
+    columna = colnames(df)[i]
+    if (columna == "week") {
+      next
+    }
+    df_lag[paste(columna, var, "lag", as.character(n), sep = "_")] = lag(df[columna], n)
+    df_lag <- df_lag |> 
+      select(-columna)
+  }
+  return(df_lag)
+}
+
+week_canton_fun <- function(df) {
+  df_wk <- df |> 
+  drop_na() |> 
+  pivot_longer(cols = 2:ncol(df)) |> 
+  mutate(canton = str_extract(name, "^[^_]+")) |> 
+  mutate(var = str_extract(name, "(?<=^[^_]{0,100}_).*")) |> 
+  mutate(week_canton = paste(week, canton, sep = "-")) |> 
+  select(week_canton, var, value) |> 
+  pivot_wider(id_cols = week_canton, names_from = var, values_from = value)
+  
+  return(df_wk)
+}
+
+calculate_lags <- function(df, var, n) {
+  df_lags <- week_canton_fun(lags(separate_canton(df, var), n, var))
+  return(df_lags)
+}
+```
+
+# Casos 
+
+```{r}
+casos <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\casos_dengue.csv)")
+```
+
+```{r}
+casos_long <- separate_canton(casos, "casos") |> 
+  select(-c("0", "1", "2", "3", "4", "5", "6", "7", "98", "99"))
+```
+
+```{r}
+casos_lag_1 <- week_canton_fun(lags(casos_long, 1, "casos"))
+casos_lag_2 <- week_canton_fun(lags(casos_long, 2, "casos"))
+casos_lag_3 <- week_canton_fun(lags(casos_long, 3, "casos"))
+casos_lag_4 <- week_canton_fun(lags(casos_long, 4, "casos"))
+casos_lag_5 <- week_canton_fun(lags(casos_long, 5, "casos"))
+casos_lag_6 <- week_canton_fun(lags(casos_long, 6, "casos"))
+casos_lag_7 <- week_canton_fun(lags(casos_long, 7, "casos"))
+casos_lag_8 <- week_canton_fun(lags(casos_long, 8, "casos"))
+```
+
+```{r}
+casos_lags <- casos_lag_8 |> 
+  left_join(casos_lag_7, by = "week_canton") |> 
+  left_join(casos_lag_6, by = "week_canton") |> 
+  left_join(casos_lag_5, by = "week_canton") |> 
+  left_join(casos_lag_4, by = "week_canton") |> 
+  left_join(casos_lag_3, by = "week_canton") |> 
+  left_join(casos_lag_2, by = "week_canton") |> 
+  left_join(casos_lag_1, by = "week_canton")
+```
+
+```{r}
+write.csv(casos_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\lags\casos_dengue_lags.csv)")
+```
+
+# Riesgo relativo
+
+```{r}
+casos <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\casos_dengue.csv)")
+```
+
+# Tmax
+
+# Tmin
+
+# LST
+
+# CHIRPS
+
+# Trends
+
+# Campañas
