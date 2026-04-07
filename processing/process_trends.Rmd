@@ -61,7 +61,7 @@ trends_group_weeks <- trends_group_weeks |>
 ```
 
 ```{r}
-write.csv(trends_group_weeks, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_group_eda.csv)")
+# write.csv(trends_group_weeks, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_group_eda.csv)")
 ```
 
 
@@ -101,7 +101,7 @@ trends_group_wide <- pivot_wider(trends_group_pairs, id_cols = week_canton, name
 ```
 
 ```{r}
-write.csv(trends_group_pairs, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_group.csv)")
+# write.csv(trends_group_pairs, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_group.csv)")
 ```
 
 # Keywords
@@ -128,7 +128,7 @@ select(-c(date, year, week1))
 ```
 
 ```{r}
-write.csv(trends_key_weeks, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_key_eda.csv)")
+# write.csv(trends_key_weeks, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_key_eda.csv)")
 ```
 
 ```{r}
@@ -168,7 +168,7 @@ trends_key_wide <- pivot_wider(trends_key_pairs, names_from = keyword, values_fr
 ```
 
 ```{r}
-write.csv(trends_key_pairs, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)")
+write.csv(trends_key_wide, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)")
 ```
 
 
