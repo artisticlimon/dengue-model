@@ -269,7 +269,89 @@ write.csv(precip_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuen
 # Trends
 
 ```{r}
+trends_1 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, aedes.aegypti)
 
+trends_2 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, criaderos.de.mosquito)
+
+trends_3 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, fiebre)
+
+trends_4 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, plaquetas)
+
+trends_5 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, buscar.trabajo)
+
+trends_6 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, desempleo)
+
+trends_7 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, empleo)
+
+trends_8 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, comprar.carro)
+
+trends_9 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, préstamo)
+
+trends_10 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, tiquetes.avion)
+
+trends_11 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, vacaciones)
+
+trends_12 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, corte.agua)
+
+trends_13 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, corte.de.agua)
+
+trends_14 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, suspension.de.agua)
+```
+
+```{r}
+trends_1_lag <- lag_8_df(trends_1, "aedes.aegypti")
+trends_2_lag <- lag_8_df(trends_2, "criaderos.de.mosquito")
+trends_3_lag <- lag_8_df(trends_3, "fiebre")
+trends_4_lag <- lag_8_df(trends_4, "plaquetas")
+trends_5_lag <- lag_8_df(trends_5, "buscar.trabajo")
+trends_6_lag <- lag_8_df(trends_6, "desempleo")
+trends_7_lag <- lag_8_df(trends_7, "empleo")
+trends_8_lag <- lag_8_df(trends_8, "comprar.carro")
+trends_9_lag <- lag_8_df(trends_9, "préstamo")
+trends_10_lag <- lag_8_df(trends_10, "tiquetes.avion")
+trends_11_lag <- lag_8_df(trends_11, "vacaciones")
+trends_12_lag <- lag_8_df(trends_12, "corte.agua")
+trends_13_lag <- lag_8_df(trends_13, "corte.de.agua")
+trends_14_lag <- lag_8_df(trends_14, "suspension.de.agua")
+```
+
+```{r}
+lags_prueba <- left_join(trends_1_lag, trends_4_lag, by = "week_canton")
+```
+
+
+```{r}
+trends_lags <- left_join(trends_1_lag, trends_2_lag, by = "week_canton") |> 
+  left_join(trends_3_lag, by = "week_canton") |> 
+  left_join(trends_4_lag, by = "week_canton") |> 
+  left_join(trends_5_lag, by = "week_canton") |> 
+  left_join(trends_6_lag, by = "week_canton") |> 
+  left_join(trends_7_lag, by = "week_canton") |> 
+  left_join(trends_8_lag, by = "week_canton") |> 
+  left_join(trends_9_lag, by = "week_canton") |> 
+  left_join(trends_10_lag, by = "week_canton") |> 
+  left_join(trends_11_lag, by = "week_canton") |> 
+  left_join(trends_12_lag, by = "week_canton") |> 
+  left_join(trends_13_lag, by = "week_canton") |> 
+  left_join(trends_14_lag, by = "week_canton")
+```
+
+```{r}
+write.csv(trends_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\lags\trends_keywords_lags.csv)")
 ```
 
 # Campañas
