@@ -43,7 +43,6 @@ trends_group <- trends_full |>
 
 
 ```{r}
-
 weeks_date <- seq(ymd("2020-01-01"), ymd("2025-12-31"), by = "week")
   
 trends_group_weeks <- trends_group |> 
@@ -156,6 +155,13 @@ trends_key_canton <- trends_key_weeks |>
             by = "province", 
             relationship = "many-to-many") |> 
   select(province, keyword, week, ID, everything())
+```
+
+```{r}
+unique(trends_key_canton$province)
+```
+```{r}
+which(is.na(trends_raw$value))
 ```
 
 
