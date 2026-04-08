@@ -371,4 +371,17 @@ write.csv(sst_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta 
 
 # NDVI
 
+```{r}
+ndvi <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\NDVI_int.csv)") |> 
+  select(week_canton, ndvi)
+```
+
+```{r}
+ndvi_lags <- lag_8_df(ndvi, "ndvi")
+```
+
+```{r}
+write.csv(ndvi_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\lags\NDVI_lags.csv)")
+```
+
 # Campañas
