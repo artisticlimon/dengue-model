@@ -354,4 +354,21 @@ trends_lags <- left_join(trends_1_lag, trends_2_lag, by = "week_canton") |>
 write.csv(trends_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\lags\trends_keywords_lags.csv)")
 ```
 
+# SST
+
+```{r}
+sst <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\SST_int.csv)") |> 
+  select(week_canton, nino34ssta)
+```
+
+```{r}
+sst_lags <- lag_8_df(sst, "nino34ssta")
+```
+
+```{r}
+write.csv(sst_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\lags\sst_lags.csv)")
+```
+
+# NDVI
+
 # Campañas
