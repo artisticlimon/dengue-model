@@ -1,6 +1,7 @@
 ```{r}
 library(lubridate)
 library(dplyr)
+library(tidyr)
 library(readxl)
 ```
 
@@ -35,17 +36,19 @@ precip |> group_by(canton, longitude, latitude) |>
 
 ```{r}
 precip_weekly_site <- precip |> 
-  mutate(year = isoyear(time)) |> 
-  mutate(week1 = isoweek(time)) |>
-  group_by(week1, year, canton) |> 
-  summarise(precip_total = sum(precip),
-            precip_min = min(precip), 
-            precip_max = max(precip),
-            precip_mean = mean(precip),
-            precip_median = median(precip),
-    .groups = "drop" ) |> 
+  group_by(canton, year = isoyear(time), week1 = isoweek(time)) |> 
+  summarise(
+    precip_total = sum(precip),
+    precip_min   = min(precip), 
+    precip_max   = max(precip),
+    precip_mean  = mean(precip),
+    precip_median = median(precip),
+    .groups = "drop"
+  ) |>  
   mutate(week = paste(year, week1, sep = "-")) |> 
-  filter(!grepl("-53$", week))
+  filter(!grepl("-53$", week)) |> 
+  filter(year < 2026) 
+
 ```
 ```{r}
 precip_weekly_site
@@ -92,52 +95,31 @@ para_eda <- function(df, var) {
 ```
 
 ```{r}
-para_eda(precip_weekly, precip_total)
+para_eda(precip_weekly, "precip_total")
 
-para_eda(precip_weekly, precip_min)
+para_eda(precip_weekly, "precip_min")
 
-para_eda(precip_weekly, precip_max)
+para_eda(precip_weekly, "precip_max")
 
-para_eda(precip_weekly, precip_mean)
+para_eda(precip_weekly, "precip_mean")
 
-para_eda(precip_weekly, precip_median)
+para_eda(precip_weekly, "precip_median")
 ```
-
-
-```{r}
-write.csv(precip_total, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/precip_total_eda.csv")
-
-write.csv(precip_min, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/precip_min_eda.csv")
-
-write.csv(precip_max, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/precip_max_eda.csv")
-
-write.csv(precip_mean, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/precip_mean_eda.csv")
-
-write.csv(precip_median, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/precip_median_eda.csv")
-```
-
 
 ```{r}
 precip_weekly <- precip_weekly  |> 
+  filter(ID != 607) |> 
   mutate(week_canton = paste(week, ID, sep = "-")) |> 
   select(-c(ID, week))
 ```
-```{r}
-precip$week
-```
 
-```{r}
-52*6*82 - 24600
-```
 ```{r}
 precip_weekly
 ```
 
-
 ```{r}
 write.csv(precip_weekly, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/precip_weekly.csv")
 ```
-
 
 
 
