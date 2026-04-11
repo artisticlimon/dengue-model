@@ -1,0 +1,332 @@
+```{r}
+library(dplyr)
+library(readxl)
+library(sf)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(corrgram)
+```
+
+```{r}
+corre <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/full_data.csv")
+```
+
+```{r}
+columnas_no_lag <- colnames(corre)[!grepl("lag_5", colnames(corre))]
+columnas_no_lag <- columnas_no_lag[!grepl("lag_6", columnas_no_lag)]
+columnas_no_lag <- columnas_no_lag[!grepl("lag_7", columnas_no_lag)]
+columnas_no_lag <- columnas_no_lag[!grepl("lag_8", columnas_no_lag)]
+columnas_tmax <- columnas_no_lag[grepl("tmax", columnas_no_lag)]
+columnas_tmin <- columnas_no_lag[grepl("tmin", columnas_no_lag)]
+columnas_precip <- columnas_no_lag[grepl("precip", columnas_no_lag)]
+corre1 <- corre |> 
+  select(columnas_no_lag) |> 
+  select(columnas_tmax)
+
+corre2 <- corre |> 
+  select(columnas_no_lag) |> 
+  select(columnas_tmin)
+
+corre3 <- corre |> 
+  select(columnas_no_lag) |> 
+  select(columnas_precip)
+```
+
+```{r warnings = FALSE}
+suppressWarnings(corrgram(corre1, upper.panel = panel.conf, diag.panel = panel.density))
+```
+```{r warnings = FALSE}
+suppressWarnings(corrgram(corre2, upper.panel = panel.conf, diag.panel = panel.density))
+```
+
+```{r warnings = FALSE}
+suppressWarnings(corrgram(corre3, upper.panel = panel.conf, diag.panel = panel.density))
+```
+
+# Cases
+
+```{r}
+cases <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/cases_dengue_rr.csv")
+
+colnames(cases) <- gsub("X", "", colnames(cases))
+```
+
+```{r}
+print("Medidas Golfito")
+
+paste0("Porcentaje de ceros: ", round(100 * sum(cases$`607` == 0) / nrow(cases), 2))
+
+paste0("Promedio de casos: ", round(mean(cases$`607`), 0))
+
+paste0("Máximo de casos: ", round(max(cases$`607`), 0))
+```
+
+```{r}
+cases_vis = data.frame("Semana epidemiológica"=cases$semana[1:5], "Total"= cases$"0"[1:5], "San José"= cases$"101"[1:5], "Alajuela"= cases$"201"[1:5], "Cartago"= cases$"301"[1:5], "Heredia"= cases$"401"[1:5], "Liberia"= cases$"501"[1:5], "Puntarenas"= cases$"601"[1:5], "Limón"= cases$"701"[1:5], check.names = FALSE)
+
+save(cases_vis, file = r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\tables\cases_vis.Rdata)")
+```
+
+```{r}
+total_stats = data.frame("Medida"=c("Media", "Desviación estándar", "Mediana", "Primer cuartil", "Tercer cuartil"), "Valor"= c(round(mean(cases$"0"), 2), round(sd(cases$"0"), 2), round(quantile(cases$"0", probs = 0.5), 2), round(quantile(cases$"0", probs = 0.25), 2), round(quantile(cases$"0", probs = 0.75, 2))), check.names = FALSE)
+
+save(total_stats, file = r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\tables\total_stats.Rdata)")
+```
+
+
+# Population
+
+
+```{r}
+cantones <- st_read(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\canton-shapes\UGEC_MGN_2022.shp)")
+
+cantones <- st_transform(cantones, 4326)
+
+pob <- read_excel(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\pob_anual.xlsx)")
+
+cantones$NOMB_UGEC[60] = "CAÑAS"
+
+colnames(cantones)[which(colnames(cantones) == "COD_UGEC")] = "codigo"
+
+cantones$codigo = as.numeric(cantones$codigo)
+
+cant_pob <- left_join(cantones, pob, by = "codigo") |> 
+  filter(!codigo %in% c(612, 613)) |> 
+  select(c(codigo, geometry, "2020", "2021", "2022", "2023", "2024", "2025")) 
+
+cant_pob_long <- pivot_longer(cant_pob, cols = c("2020", "2021", "2022", "2023", "2024", "2025"), names_to = "year", values_to = "pob")
+```
+
+```{r}
+ggplot(cant_pob_long) +
+  geom_sf(aes(fill = pob)) +
+  facet_wrap(~year, nrow = 3, ncol = 2) +
+  coord_sf(
+    xlim = c(-86, -80),   
+    ylim = c(8,  11.4),   
+    expand = FALSE
+  ) +
+  scale_fill_gradient(low = "white", high = "darkred", name = "Población", labels = comma) + 
+  theme_void() +                                        
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.border = element_blank(),
+    legend.position = "right"                           
+  )
+
+ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Población de los distintos cantones de Costa Rica, 2020-2025.png)")
+```
+# Relative risk
+
+```{r}
+rr <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\relative_risk.csv)")
+
+rr_0 <- rr |> 
+  filter(rr == 0)
+
+round(nrow(rr_0) / nrow(rr), 2)
+```
+
+# Urbanization
+```{r}
+urb <- read_excel(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\grado_de_urbanidad.xlsx)")
+```
+
+```{r}
+urb$URBANIZACION = as.factor(urb$URBANIZACION)
+urb2 <- urb |> 
+  group_by(URBANIZACION) |> 
+  summarise(conteo = n()) |> 
+  mutate(porcentaje = round(100 * conteo / sum(conteo), 2))
+
+urb1 <- data.frame("Grado de Urbanidad" = c("Rural", "Rural-Urbano", "Urbano"), "Máxima" = c(urb2$conteo[1], urb2$conteo[2], urb2$conteo[3]), "Porcentaje" = c(urb2$porcentaje[1], urb2$porcentaje[2], urb2$porcentaje[3]), check.names = FALSE)
+
+save(urb1, file = r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\tables\urb1.Rdata)")
+```
+```{r}
+urb <- read_excel(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\grado_de_urbanidad.xlsx)")
+
+colnames(urb)[which(colnames(urb) == "ID")] = "codigo"
+```
+
+```{r}
+cantones <- st_read(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\canton-shapes\UGEC_MGN_2022.shp)")
+
+colnames(cantones)[which(colnames(cantones) == "COD_UGEC")] = "codigo"
+
+cantones$codigo = as.numeric(cantones$codigo)
+
+cantones <- st_transform(cantones, 4326)
+```
+```{r}
+cant_urb <- left_join(cantones, urb, by = "codigo") |> 
+  filter(!codigo %in% c(612, 613)) |> 
+  select(c(codigo, geometry, URBANIZACION)) 
+```
+
+
+```{r}
+ggplot(cant_urb) +
+  geom_sf(aes(fill = URBANIZACION)) +
+  coord_sf(
+    xlim = c(-86, -82),   
+    ylim = c(8,  11.4), 
+    expand = FALSE
+  ) +
+  scale_fill_discrete(name = "Grado de urbanización") +
+  theme_void() +                                        
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.border = element_blank(),
+    legend.position = "right"                           
+  )
+
+ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Grado de urbanización de los cantones de Costa Rica, 2022.png)")
+```
+
+# Trends
+
+## Group
+
+```{r}
+trends_group <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_group_eda.csv)")
+```
+
+```{r}
+ceros_groups <- trends_group |> 
+  filter(province != 0) |> 
+  mutate(categoria = case_when(group == "dengue_spread" ~ "Propagación del dengue",
+                                 group == "employment" ~ "Empleo",
+                                 group == "mobility_finance" ~ "Mobilidad financiera", 
+                                 group == "water" ~ "Agua")) |> 
+  mutate(provincia = case_when(province == 1 ~ "1San José", 
+                               province == 2 ~ "2Alajuela",
+                               province == 3 ~ "3Cartago",
+                               province == 4 ~ "4Heredia", 
+                               province == 5 ~ "5Guanacaste", 
+                               province == 6 ~ "6Puntarenas", 
+                               province == 7 ~ "7Limón")) |> 
+  group_by(categoria, provincia) |> 
+  filter(value == 0) |> 
+  summarise(ceros = round(100 * n() / 312, 2), 
+            .groups = "keep")
+
+ceros_groups_wide <- pivot_wider(ceros_groups, id_cols = "categoria", names_from = "provincia", values_from = "ceros")
+
+colnames(ceros_groups_wide) <- c("Categoría","San José", "Alajuela", "Cartago", "Heredia", "Guanacaste", "Puntarenas", "Limón")
+ceros_groups_wide
+
+save(ceros_groups_wide, file = r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\tables\trends_groups_ceros.Rdata)")
+```
+
+```{r}
+trends_group_grouped |> 
+  left_join(trends_group_zeros, by = c(group, province)) |> 
+  mutate(porcentaje = round(100 * ceros / total))
+```
+## Campaigns
+
+```{r}
+campa <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/campaigns_eda.csv")
+```
+
+```{r}
+cantones <- st_read(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\canton-shapes\UGEC_MGN_2022.shp)")
+
+cantones <- st_transform(cantones, 4326)
+
+cantones$NOMB_UGEC[60] = "CAÑAS"
+
+colnames(cantones)[which(colnames(cantones) == "COD_UGEC")] = "codigo"
+```
+
+```{r}
+campa_map <- cantones |> 
+  select(codigo, geometry)
+
+campa_map <- campa_map |> 
+  mutate(presencia = case_when(codigo %in% as.character(campa$ID) ~ 1,
+                               TRUE ~ 0))
+```
+
+```{r}
+ggplot(campa_map) +
+  geom_sf(aes(fill = factor(presencia))) +
+  coord_sf(
+    xlim = c(-86, -82),   
+    ylim = c(8,  11.4), 
+    expand = FALSE
+  ) +
+  theme_void() +
+  scale_fill_manual(
+    values = c("0" = "gray80", "1" = "darkblue"),
+    labels = c("0" = "Sin campañas", "1" = "Con campañas"),
+    name = "Campañas"
+  ) +
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.border = element_blank(),
+    legend.position = "right"                           
+  )
+
+ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Cantones con campañas de prevención (todo tipo), 2020-2025.png)")
+```
+```{r}
+campa_cal <- data.frame("annio" = rep(2020:2025, each = 12), "mes1" = rep(1:12, 6)) |> 
+  mutate(mes_num = case_when(mes1 == 1 ~ "01",
+                             mes1 == 2 ~ "02",
+                             mes1 == 3 ~ "03", 
+                             mes1 == 4 ~ "04",
+                             mes1 == 5 ~ "05",
+                             mes1 == 6 ~ "06",
+                             mes1 == 7 ~ "07",
+                             mes1 == 8 ~ "08",
+                             mes1 == 9 ~ "09",
+                             mes1 == 10 ~ "10",
+                             mes1 == 11 ~ "11",
+                             mes1 == 12 ~ "12")) |> 
+  mutate(mes_annio = paste(annio, mes_num, sep = "-")) |> 
+  mutate(presencia = case_when(mes_annio %in% as.character(campa$mes_annio) ~ 1,
+                               TRUE ~ 0))
+
+campa_cal$presencia = factor(campa_cal$presencia)
+
+```
+
+```{r}
+ggplot(campa_cal, aes(x = factor(mes1), y = factor(annio), fill = presencia)) +
+  geom_tile(color = "black", linewidth = 0.5) +   
+  scale_fill_manual(
+    values = c("0" = "gray80", "1" = "darkblue"),
+    labels = c("0" = "Sin campañas", "1" = "Con campañas"),
+    name = "Campañas"
+  ) +
+  scale_y_discrete(limits = rev) + 
+  theme_minimal() +
+  labs(x = "Mes", y = "Año") +
+  theme(panel.grid = element_blank())
+
+ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Meses con campañas de prevención (todo tipo), 2020-2025.png)", width = 10, height = 6, units = "in")
+```
+
+
+

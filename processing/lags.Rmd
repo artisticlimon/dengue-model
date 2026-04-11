@@ -137,83 +137,31 @@ write.csv(rr_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta p
 # Tmax
 
 ```{r}
-tmax_min <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\tmax_weekly.csv)") |> 
-  select(week_canton, tmax_min) 
-
-tmax_min <- tmax_min[!grepl("-607", tmax_min$week_canton),]
-
-tmax_max <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\tmax_weekly.csv)") |> 
-  select(week_canton, tmax_max)
-
-tmax_max <- tmax_max[!grepl("-607", tmax_max$week_canton),]
-
 tmax_mean <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\tmax_weekly.csv)") |> 
   select(week_canton, tmax_mean)
-
-tmax_mean <- tmax_mean[!grepl("-607", tmax_mean$week_canton),]
-
-tmax_median<- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\tmax_weekly.csv)") |> 
-  select(week_canton, tmax_median)
-
-tmax_median <- tmax_median[!grepl("-607", tmax_median$week_canton),]
 ```
 
 ```{r}
-tmax_max_lag <- lag_8_df(tmax_max, "tmax_max")
 tmax_mean_lag <- lag_8_df(tmax_mean, "tmax_mean")
-tmax_median_lag <- lag_8_df(tmax_median, "tmax_median")
-tmax_min_lag <- lag_8_df(tmax_min, "tmax_min")
 ```
 
 ```{r}
-tmax_lags <- left_join(tmax_max_lag, tmax_mean_lag, by = "week_canton") |> 
-  left_join(tmax_median_lag, by = "week_canton") |>
-  left_join(tmax_min_lag, by = "week_canton") 
-```
-
-```{r}
-write.csv(tmax_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\lags\tmax_lags.csv)")
+write.csv(tmax_mean_lag, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\lags\tmax_lags.csv)")
 ```
 
 # Tmin
 
 ```{r}
-tmin_min <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\tmin_weekly.csv)") |> 
-  select(week_canton, tmin_min) 
-
-tmin_min <- tmin_min[!grepl("-607", tmin_min$week_canton),]
-
-tmin_max <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\tmin_weekly.csv)") |> 
-  select(week_canton, tmin_max)
-
-tmin_max <- tmin_max[!grepl("-607", tmin_max$week_canton),]
-
 tmin_mean <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\tmin_weekly.csv)") |> 
   select(week_canton, tmin_mean)
-
-tmin_mean <- tmin_mean[!grepl("-607", tmin_mean$week_canton),]
-
-tmin_median<- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\tmin_weekly.csv)") |> 
-  select(week_canton, tmin_median)
-
-tmin_median <- tmin_median[!grepl("-607", tmin_median$week_canton),]
 ```
 
 ```{r}
-tmin_max_lag <- lag_8_df(tmin_max, "tmin_max")
 tmin_mean_lag <- lag_8_df(tmin_mean, "tmin_mean")
-tmin_median_lag <- lag_8_df(tmin_median, "tmin_median")
-tmin_min_lag <- lag_8_df(tmin_min, "tmin_min")
 ```
 
 ```{r}
-tmin_lags <- left_join(tmin_max_lag, tmin_mean_lag, by = "week_canton") |> 
-  left_join(tmin_median_lag, by = "week_canton") |>
-  left_join(tmin_min_lag, by = "week_canton") 
-```
-
-```{r}
-write.csv(tmin_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\lags\tmin_lags.csv)")
+write.csv(tmin_mean_lag, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\lags\tmin_lags.csv)")
 ```
 
 # LST
@@ -224,27 +172,17 @@ write.csv(tmin_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta
 precip_total <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\precip_weekly.csv)") |> 
   select(week_canton, precip_total) 
 
-precip_total <- precip_total[!grepl("-607", precip_total$week_canton),]
-
 precip_min <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\precip_weekly.csv)") |> 
   select(week_canton, precip_min) 
-
-precip_min <- precip_min[!grepl("-607", precip_min$week_canton),]
 
 precip_max <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\precip_weekly.csv)") |> 
   select(week_canton, precip_max)
 
-precip_max <- precip_max[!grepl("-607", precip_max$week_canton),]
-
 precip_mean <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\precip_weekly.csv)") |> 
   select(week_canton, precip_mean)
 
-precip_mean <- precip_mean[!grepl("-607", precip_mean$week_canton),]
-
 precip_median<- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\precip_weekly.csv)") |> 
   select(week_canton, precip_median)
-
-precip_median <- precip_median[!grepl("-607", precip_median$week_canton),]
 ```
 
 ```{r}
