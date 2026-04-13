@@ -164,6 +164,21 @@ tmin_mean_lag <- lag_8_df(tmin_mean, "tmin_mean")
 write.csv(tmin_mean_lag, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\lags\tmin_lags.csv)")
 ```
 
+# Temp_prom
+
+```{r}
+temp_prom <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\temp_prom.csv)") |> 
+  select(week_canton, temp_prom)
+```
+
+```{r}
+temp_prom_lag <- lag_8_df(temp_prom, "temp_prom")
+```
+
+```{r}
+write.csv(temp_prom_lag, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\lags\temp_prom_lags.csv)")
+```
+
 # LST
 
 # CHIRPS

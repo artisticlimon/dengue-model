@@ -32,7 +32,8 @@ tmax_weekly_site <- tmax |>
   summarise(tmax_mean = mean(temp),
     .groups = "drop" )  |> 
   mutate(week = paste(year, week1, sep = "-")) |> 
-  filter(!grepl("-53$", week))
+  filter(!grepl("-53$", week)) |> 
+  filter(!grepl("2026", week))
 ```
 
 ```{r}
@@ -82,7 +83,7 @@ tmax_weekly
 ```
 
 ```{r}
-for (i in 1:299) {
+for (i in 1:312) {
   curr_week = unique(tmax_weekly$week)[i]
   df_int <- tmax_weekly |> 
   filter(week == curr_week)
@@ -103,8 +104,6 @@ for (i in 1:299) {
 
   tmax_weekly$tmax_mean[tmax_weekly$week == curr_week & tmax_weekly$ID == 607] =   golfito$var1.pred
 }
-
-tmax_weekly <- drop_na(tmax_weekly)
 
 tmax_weekly = tmax_weekly |> 
   select(tmax_mean, week, ID)
@@ -161,7 +160,8 @@ tmin_weekly_site <- tmin |>
   summarise(tmin_mean = mean(temp),
     .groups = "drop" )  |> 
   mutate(week = paste(year, week1, sep = "-")) |> 
-  filter(!grepl("-53$", week))
+  filter(!grepl("-53$", week)) |> 
+  filter(!grepl("2026", week))
 ```
 
 ```{r}
@@ -211,7 +211,7 @@ tmin_weekly
 ```
 
 ```{r}
-for (i in 1:300) {
+for (i in 1:312) {
   curr_week = unique(tmin_weekly$week)[i]
   df_int <- tmin_weekly |> 
   filter(week == curr_week)
@@ -247,27 +247,46 @@ para_eda <- function(df, var) {
 ```
 
 ```{r}
+tmax_mean <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\tmax_weekly.csv)") |> 
+  select(week_canton, tmax_mean)
+
+tmin_weekly$temp_prom <- (tmax_mean$tmax_mean + tmin_weekly$tmin_mean) / 2
+```
+
+```{r}
 #para_eda(tmin_weekly, "tmin_min")
 
 #para_eda(tmin_weekly, "tmin_min")
 
 para_eda(tmin_weekly, "tmin_mean")
 
+para_eda(tmin_weekly, "temp_prom")
+
 #para_eda(tmin_weekly, "tmin_median")
 ```
 
 
 ```{r}
-tmin_weekly <- tmin_weekly  |> 
+tmin_mean <- tmin_weekly  |> 
   mutate(week_canton = paste(week, ID, sep = "-")) |> 
   select(tmin_mean, week_canton)
 ```
 
 ```{r}
-tmin_weekly
+temp_prom <- tmin_weekly |> 
+  mutate(week_canton = paste(week, ID, sep = "-")) |> 
+  select(temp_prom, week_canton)
 ```
+
+
 ```{r}
-write.csv(tmin_weekly, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/tmin_weekly.csv")
+tmin_mean
+```
+
+```{r}
+write.csv(tmin_mean, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/tmin_weekly.csv")
+
+write.csv(temp_prom, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/temp_prom.csv")
 ```
 
 
