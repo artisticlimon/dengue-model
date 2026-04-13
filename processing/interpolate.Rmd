@@ -6,6 +6,8 @@ library(purrr)
 library(readxl)
 library(tidyr)
 library(readr)
+library(sf)
+library(gstat)
 ```
 # Functions
 
@@ -70,7 +72,7 @@ interpolate_ndvi <- function(df_small, first_day, last_day) {
 
   df_int <- as_tibble(X_imp, .names = num_cols) |>
     bind_cols(fecha = df$fecha)
-   weeks_date <- seq(first_day, last_day, by = "week")
+  weeks_date <- seq(first_day, last_day, by = "week")
   
   df_filter_weeks <- df_int %>% 
   filter(fecha %in% weeks_date) %>% 
@@ -121,9 +123,9 @@ interpolate_lst <- function(df_small, first_day, last_day) {
 ```{r}
 canton_week <- function(df, var_name) {
   df_pivot = pivot_longer(df, cols = -c("week"), names_to = "code", values_to = var_name)
-df_pivot <- df_pivot |> 
-  mutate(week_canton = paste(week, code, sep = "-")) |> 
-  select(week_canton, var_name)
+  df_pivot <- df_pivot |> 
+    mutate(week_canton = paste(week, code, sep = "-")) |> 
+    select(week_canton, all_of(var_name))
   return(df_pivot)
 }
 ```
@@ -184,8 +186,12 @@ baseNDVI <- baseNDVI |>
 ```
 
 ```{r}
-baseNDVI_wide <- pivot_wider(baseNDVI, names_from = ID, values_from =  ndvi) |> 
-  select(-c("607"))
+which(is.na(baseNDVI$ndvi) & baseNDVI$ID != 607) # Todos los NA son Golfito
+```
+
+
+```{r}
+baseNDVI_wide <- pivot_wider(baseNDVI, names_from = ID, values_from =  ndvi)
 ```
 
 ```{r}
@@ -193,15 +199,118 @@ baseNDVI_wide
 ```
 
 ```{r}
-baseNDVI_int <- interpolate_ndvi(baseNDVI_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31")) 
+baseNDVI_int <- baseNDVI_wide |> 
+  select(-"607") |> 
+  interpolate_ndvi(first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31")) 
 ```
 
 ```{r}
-write.csv(baseNDVI_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/NDVI_eda.csv")
+baseNDVI_int$"607" <- rep(NA, 312)
+baseNDVI_int_long <- pivot_longer(baseNDVI_int, cols = c(-(week))) |> 
+  select(week, ID = name, ndvi = value)
 ```
 
 ```{r}
-baseNDVI_pivot <- canton_week(baseNDVI_int, var_name = "ndvi") 
+precip <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps/chirps_precip.csv")
+```
+
+```{r}
+precip$time = ymd(precip$time)
+```
+
+```{r}
+precip_weekly_site <- precip |> 
+  group_by(canton, year = isoyear(time), week1 = isoweek(time)) |>
+  summarise(precip_total = sum(precip),
+    .groups = "drop" )  |> 
+  mutate(week = paste(year, week1, sep = "-")) |> 
+  filter(!grepl("-53$", week)) |> 
+  filter(!grepl("2026-", week))
+```
+
+```{r}
+codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+
+codes <- codes |> 
+  select(ID, "PROVINCIA Y CANTON") |> 
+  filter(ID >= 101)
+
+colnames(codes) = c("ID", "canton")
+```
+
+```{r}
+codes[11, "canton"] = "VAZQUEZ DE CORONADO"
+codes[20, "canton"] = "LEON CORTES CASTRO"
+codes[31, "canton"] = "ZARCERO"
+codes[32, "canton"] = "SARCHI"
+```
+
+```{r}
+precip_weekly_site <- precip_weekly_site |> 
+   mutate(canton = toupper(canton)) |> 
+   mutate(canton = chartr("áéíóúñÁÉÍÓÚ", "aeiounAEIOU", canton)) 
+```
+
+```{r}
+precip_lon <- precip[!duplicated(precip$lon),] |> 
+  select(canton, lon)
+
+precip_lat <- precip[!duplicated(precip$lat),] |> 
+  select(canton, lat)
+
+precip_lon_lat <- left_join(precip_lon, precip_lat, by = "canton") |> 
+   mutate(canton = toupper(canton)) |> 
+   mutate(canton = chartr("áéíóúñÁÉÍÓÚ", "aeiounAEIOU", canton)) 
+```
+
+```{r}
+precip_weekly <- left_join(precip_weekly_site, codes, by = "canton") |> 
+  left_join(precip_lon_lat, by = "canton") |> 
+  select(-c(year, week1, canton))
+```
+
+```{r}
+baseNDVI_int_long$ID <- as.numeric(baseNDVI_int_long$ID)
+baseNDVI_int_long_precip <- left_join(baseNDVI_int_long, precip_weekly, by = c("week", "ID")) |> 
+  select(-precip_total)
+```
+
+```{r}
+for (i in 1:312) {
+  curr_week = unique(baseNDVI_int_long_precip$week)[i]
+  df_int <- baseNDVI_int_long_precip |> 
+  filter(week == curr_week)
+
+  coop <- st_as_sf(df_int, coords = c("lon", "lat"), crs = 4326)
+
+  coop <- coop |> 
+    filter(ID == 607) |> 
+    select(ndvi, ID)
+
+  ndvi_ap <- df_int |> 
+    filter(!is.na(ndvi))|> 
+    st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE) 
+
+  res <- gstat(formula = ndvi ~ 1, locations = ndvi_ap, nmax = 5, set = list(idp = 0))
+
+  golfito <- predict(res, coop, debug.level = 0)
+
+  baseNDVI_int_long_precip$ndvi[baseNDVI_int_long_precip$week == curr_week & baseNDVI_int_long_precip$ID == 607] = golfito$var1.pred
+}
+```
+
+```{r}
+baseNDVI_eda <- baseNDVI_int_long_precip |> 
+  select(-lon, -lat) |> 
+  pivot_wider(id_cols = "week", names_from = -c("week", "ndvi"), values_from = "ndvi")
+```
+
+```{r}
+write.csv(baseNDVI_eda, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/NDVI_eda.csv")
+```
+
+```{r}
+baseNDVI_pivot <- canton_week(baseNDVI_eda, "ndvi")
 ```
 
 ```{r}
@@ -326,12 +435,17 @@ write.csv(baseSST1, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta pe
 ```
 
 ```{r}
-baseSST_int <- interpolate_ndvi(baseSST1, first_day = ymd("2020-01-01"), last_day =  ymd("2025-12-31"))
+baseSST_int <- interpolate_ndvi(baseSST1, first_day = ymd("2020-01-01"), last_day =  ymd("2025-12-31")) 
 ```
 
 ```{r}
-baseSST_int
+baseSST_int  
 ```
+
+```{r}
+colnames(baseSST_int)
+```
+
 
 ```{r}
 codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
@@ -351,6 +465,9 @@ cantones_vector = as.character(cantones_vector)
 
 ```{r}
 baseSST_int[cantones_vector] <- baseSST_int$nino34ssta
+
+baseSST_int <- baseSST_int |> 
+  select(-c(nino34ssta))
 ```
 
 ```{r}
@@ -358,7 +475,7 @@ write.csv(baseSST_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta
 ```
 
 ```{r}
-baseSST_pivot <- canton_week(df = baseSST_int, var_name = "nino4ssta")
+baseSST_pivot <- canton_week(df = baseSST_int, var_name = "nino34ssta")
 ```
 
 ```{r}
