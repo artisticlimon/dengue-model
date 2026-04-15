@@ -111,23 +111,30 @@ write.csv(casos_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuent
 
 ```{r}
 rr_num <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\relative_risk.csv)") |> 
-  select(-clasi_rr)
+  select(rr, week.canton)
 
 colnames(rr_num)[which(colnames(rr_num) == "week.canton")] = "week_canton"
 
 rr_clasi <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\relative_risk.csv)") |> 
-  select(-rr)
+  select(clasi_rr, week.canton)
 
 colnames(rr_clasi)[which(colnames(rr_clasi) == "week.canton")] = "week_canton"
+
+rr_clasi_no_0 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\relative_risk.csv)") |> 
+  select(clasi_rr_no_0, week.canton)
+
+colnames(rr_clasi_no_0)[which(colnames(rr_clasi_no_0) == "week.canton")] = "week_canton"
 ```
 
 ```{r}
 rr_num_lag <- lag_8_df(rr_num, "rr")
 rr_clasi_lag <- lag_8_df(rr_clasi, "clasi_rr")
+rr_clasi_no_0_lag <- lag_8_df(rr_clasi_no_0, "clasi_rr_no_0")
 ```
 
 ```{r}
-rr_lags <- left_join(rr_num_lag, rr_clasi_lag, by = "week_canton")
+rr_lags <- left_join(rr_num_lag, rr_clasi_lag, by = "week_canton") |> 
+  left_join(rr_clasi_no_0_lag, by = "week_canton") 
 ```
 
 ```{r}
