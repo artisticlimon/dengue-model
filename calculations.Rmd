@@ -8,6 +8,265 @@ library(scales)
 library(corrgram)
 ```
 
+# Resultados de los modelos
+
+```{r}
+process_results_df <- function(df) {
+  df = df %>% 
+    separate_wider_regex(week_canton, c(week = ".*?-.*?", "-", canton = ".*"))
+  df_act <- df |> 
+    select(-pred)
+  df_pred <- df |> 
+    select(-actual)
+  week_ord <- unique(df["week"])
+  df["week"] <- factor(df["week"], levels = week_ord)
+  df_act_pivot <- pivot_wider(df_act, id_cols = week, names_from = canton, values_from = actual)
+  df_pred_pivot <- pivot_wider(df_pred, id_cols = week, names_from = canton, values_from = pred)
+  return(list(first = df_act_pivot, second = df_pred_pivot))
+}
+
+calculate_metrics <- function(df, var_type){
+  df_act_pivot = process_results_df(df)[[1]]
+  df_pred_pivot = process_results_df(df)[[2]]
+  cols = colnames(df_act_pivot)[2:length(colnames(df_act_pivot))]
+  if (var_type == "reg"){
+    mse_canton = data.frame(codigo = as.numeric(cols), mse = colMeans((df_act_pivot[cols] - df_pred_pivot[cols])^2) / colMeans(df_act_pivot[cols]))
+    return(mse_canton)
+  } else {
+    metric_canton = data.frame(codigo = as.numeric(cols), aciertos = colMeans((df_act_pivot[cols] == df_pred_pivot[cols])*100))
+    return(metric_canton)
+  }
+}
+
+map_metrics_reg <- function(df_reg, df_rf, df_xgb, cantones) {
+  metrics_reg <- calculate_metrics(df_reg, "reg") |> 
+    select(codigo, Reg = mse)
+  metrics_rf <- calculate_metrics(df_rf, "reg") |> 
+    select(codigo, RF = mse)
+  metrics_xgb <- calculate_metrics(df_xgb, "reg") |> 
+    select(codigo, XGB = mse)
+  metrics <- merge(cantones, metrics_reg, by = "codigo", all = TRUE) |> 
+    filter(!codigo %in% c(612, 613)) |> 
+    select(-ID, -NOMB_UGEP, -NOMB_UGEC, -AREA_KM2)
+  metrics <- left_join(metrics, metrics_rf, by = "codigo")
+  metrics <- left_join(metrics, metrics_xgb, by = "codigo")
+  metrics_pivot <- pivot_longer(metrics, cols = c(Reg, RF, XGB), names_to = "model", values_to = "mse")
+  
+  ggplot(metrics_pivot) +
+  geom_sf(aes(fill = mse)) +
+  facet_wrap(~model, nrow = 3, ncol = 1) + 
+  coord_sf(
+    xlim = c(-86, -80),   
+    ylim = c(8,  11.4),   
+    expand = FALSE
+  ) +
+  scale_fill_gradient(low = "white", high = "darkred", name = "MSE", labels = comma) + 
+  theme_void() +                                        
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.border = element_blank(),
+    legend.position = c(0.92, 0.9),      
+    legend.justification = c(1, 1),      
+    legend.margin   = margin(4, 4, 4, 4)                     
+  )
+}
+
+map_metrics_classi <- function(df_reg, df_rf, df_xgb, cantones) {
+  metrics_reg <- calculate_metrics(df_reg, "classi") |> 
+    select(codigo, Reg = aciertos)
+  metrics_rf <- calculate_metrics(df_rf, "classi") |> 
+    select(codigo, RF = aciertos)
+  metrics_xgb <- calculate_metrics(df_xgb, "classi") |> 
+    select(codigo, XGB = aciertos)
+  metrics <- merge(cantones, metrics_reg, by = "codigo", all = TRUE) |> 
+    filter(!codigo %in% c(612, 613)) |> 
+    select(-ID, -NOMB_UGEP, -NOMB_UGEC, -AREA_KM2)
+  metrics <- left_join(metrics, metrics_rf, by = "codigo")
+  metrics <- left_join(metrics, metrics_xgb, by = "codigo")
+  metrics_pivot <- pivot_longer(metrics, cols = c(Reg, RF, XGB), names_to = "model", values_to = "aciertos")
+  
+  ggplot(metrics_pivot) +
+  geom_sf(aes(fill = aciertos)) +
+  facet_wrap(~model, nrow = 3, ncol = 1) + 
+  coord_sf(
+    xlim = c(-86, -80),   
+    ylim = c(8,  11.4),   
+    expand = FALSE
+  ) +
+  scale_fill_gradient(low = "white", high = "darkblue", name = "% Aciertos", labels = comma) + 
+  theme_void() +                                        
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.border = element_blank(),
+    legend.position = c(0.92, 0.9),      
+    legend.justification = c(1, 1),      
+    legend.margin   = margin(4, 4, 4, 4)
+  )
+}
+```
+
+```{r}
+cantones <- st_read(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\canton-shapes\UGEC_MGN_2022.shp)")
+
+cantones <- st_transform(cantones, 4326)
+
+cantones$NOMB_UGEC[60] = "CAÑAS"
+
+colnames(cantones)[which(colnames(cantones) == "COD_UGEC")] = "codigo"
+
+cantones$codigo = as.numeric(cantones$codigo)
+```
+
+```{r}
+cases_reg <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_cases_reg.csv") |> 
+  select(-X)
+cases_rf <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_cases_rf.csv") |> 
+  select(-X)
+cases_xgb <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_cases_xgb.csv") |> 
+  select(-X)
+```
+```{r}
+png("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/cases.png", height = 800, width = 600)
+map_metrics_reg(df_reg = cases_reg, df_rf = cases_rf, df_xgb = cases_xgb, cantones)
+dev.off()
+```
+
+```{r}
+rr_reg <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_rr_reg.csv") |> 
+  select(-X)
+rr_rf <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_rr_rf.csv") |> 
+  select(-X)
+rr_xgb <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_rr_xgb.csv") |> 
+  select(-X)
+```
+
+```{r}
+map_metrics_reg(df_reg = rr_reg, df_rf = rr_rf, df_xgb = rr_xgb, cantones)
+```
+
+```{r}
+clasi_rr_reg <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_clasi_rr_reg.csv") |> 
+  select(-X)
+clasi_rr_rf <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_clasi_rr_rf.csv") |> 
+  select(-X)
+clasi_rr_xgb <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_clasi_rr_xgb.csv") |> 
+  select(-X)
+```
+
+```{r}
+map_metrics_classi(df_reg = clasi_rr_reg, df_rf = clasi_rr_rf, df_xgb = clasi_rr_xgb, cantones)
+```
+
+```{r}
+clasi_rr_no_0_reg <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_clasi_rr_no_0_reg.csv") |> 
+  select(-X)
+clasi_rr_no_0_rf <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_clasi_rr_no_0_rf.csv") |> 
+  select(-X)
+clasi_rr_no_0_xgb <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/model_results/results_clasi_rr_no_0_xgb.csv") |> 
+  select(-X)
+```
+
+```{r}
+map_metrics_classi(df_reg = clasi_rr_no_0_reg, df_rf = clasi_rr_no_0_rf, df_xgb = clasi_rr_no_0_xgb, cantones)
+```
+
+# Porcentaje de casos ceros
+```{r}
+cases <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/cases_dengue_rr.csv")
+
+colnames(cases) <- gsub("X", "", colnames(cases))
+```
+
+```{r}
+mean(cases$`117`)
+```
+
+
+```{r}
+porcentaje_de_ceros = c()
+for (i in colnames(cases)[2:length(colnames(cases))]){
+  porcentaje_de_ceros[i] = length(which(cases[i] == 0)) / nrow(cases)
+}
+```
+
+```{r}
+df_porcentaje_ceros = data.frame(codigo = as.numeric(colnames(cases)[2:length(colnames(cases))]), 
+                                 porcentaje = porcentaje_de_ceros)
+```
+
+
+```{r}
+cantones <- st_read(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\canton-shapes\UGEC_MGN_2022.shp)")
+
+cantones <- st_transform(cantones, 4326)
+
+pob <- read_excel(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\pob_anual.xlsx)")
+
+cantones$NOMB_UGEC[60] = "CAÑAS"
+
+colnames(cantones)[which(colnames(cantones) == "COD_UGEC")] = "codigo"
+
+cantones$codigo = as.numeric(cantones$codigo)
+
+cant_ceros <- left_join(cantones, df_porcentaje_ceros, by = "codigo") |> 
+  filter(!codigo %in% c(612, 613)) |> 
+  select(-ID, -NOMB_UGEP, -NOMB_UGEC, -AREA_KM2)
+
+cant_ceros$porcentaje_umb = as.numeric(cut(cant_ceros$porcentaje,
+         breaks = c(-Inf, 0.6, 0.8, Inf),
+         labels = c(0, 1, 2),
+         include.lowest = TRUE))
+```
+```{r}
+cant_ceros |> select(-geometry) |> group_by(porcentaje_umb) |> 
+  summarise(conteo = n())
+```
+
+
+```{r}
+ggplot(cant_ceros) +
+  geom_sf(aes(fill = as.factor(porcentaje_umb))) +
+  coord_sf(
+    xlim = c(-86, -80),   
+    ylim = c(8,  11.4),   
+    expand = FALSE
+  ) +
+  scale_fill_discrete(name = "Porcentaje mayor a 60%") + 
+  scale_fill_manual(
+    values = c("1" = "gray80", "2" = "darkblue", "3" = "darkred"),
+    labels = c("1" = "Menor a 60%", "2" = "Mayor a 60%", "3" = "Mayor a 80%"),
+    name = ""
+  ) +
+  theme_void() +                                        
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.border = element_blank(),
+    legend.position = "right"                           
+  )
+
+ggsave(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\mapa_porcentajes.png)")
+```
+
+# Correlaciones
+
 ```{r}
 corre <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/full_data.csv")
 ```
