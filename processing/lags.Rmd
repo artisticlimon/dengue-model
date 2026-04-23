@@ -56,13 +56,13 @@ lag_8_df <- function(df, var) {
   df_lag_7 <- calculate_lags(df, var, 7)
   df_lag_8 <- calculate_lags(df, var, 8)
   
-  df_lags <- df_lag_8 |> 
+  df_lags <- df_lag_8 |>  
     left_join(df_lag_7, by = "week_canton") |> 
     left_join(df_lag_6, by = "week_canton") |> 
-    left_join(df_lag_5, by = "week_canton") |> 
-    left_join(df_lag_4, by = "week_canton") |> 
-    left_join(df_lag_3, by = "week_canton") |> 
-    left_join(df_lag_2, by = "week_canton") |> 
+    left_join(df_lag_5, by = "week_canton") |>  
+    left_join(df_lag_4, by = "week_canton")|>  
+    left_join(df_lag_3, by = "week_canton")|>  
+    left_join(df_lag_2, by = "week_canton")|>  
     left_join(df_lag_1, by = "week_canton")
 }
   
@@ -230,10 +230,10 @@ write.csv(precip_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuen
 
 ```{r}
 trends_1 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
-  select(week_canton, aedes.aegypti)
+  select(week_canton, aedes_aegypti = aedes_aegypti)
 
 trends_2 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
-  select(week_canton, criaderos.de.mosquito)
+  select(week_canton, criaderos_de_mosquito)
 
 trends_3 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
   select(week_canton, fiebre)
@@ -242,7 +242,7 @@ trends_4 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta
   select(week_canton, plaquetas)
 
 trends_5 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
-  select(week_canton, buscar.trabajo)
+  select(week_canton, buscar_trabajo)
 
 trends_6 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
   select(week_canton, desempleo)
@@ -251,48 +251,47 @@ trends_7 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta
   select(week_canton, empleo)
 
 trends_8 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
-  select(week_canton, comprar.carro)
+  select(week_canton, comprar_carro)
 
 trends_9 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
   select(week_canton, préstamo)
 
 trends_10 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
-  select(week_canton, tiquetes.avion)
+  select(week_canton, tiquetes_avion)
 
 trends_11 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
   select(week_canton, vacaciones)
 
 trends_12 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
-  select(week_canton, corte.agua)
+  select(week_canton, corte_agua)
 
 trends_13 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
-  select(week_canton, corte.de.agua)
+  select(week_canton, corte_de_agua)
 
 trends_14 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
-  select(week_canton, suspension.de.agua)
+  select(week_canton, suspension_de_agua)
+
+trends_15 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)") |> 
+  select(week_canton, dengue)
 ```
 
 ```{r}
-trends_1_lag <- lag_8_df(trends_1, "aedes.aegypti")
-trends_2_lag <- lag_8_df(trends_2, "criaderos.de.mosquito")
+trends_1_lag <- lag_8_df(trends_1, "aedes_aegypti")
+trends_2_lag <- lag_8_df(trends_2, "criaderos_de_mosquito")
 trends_3_lag <- lag_8_df(trends_3, "fiebre")
 trends_4_lag <- lag_8_df(trends_4, "plaquetas")
-trends_5_lag <- lag_8_df(trends_5, "buscar.trabajo")
+trends_5_lag <- lag_8_df(trends_5, "buscar_trabajo")
 trends_6_lag <- lag_8_df(trends_6, "desempleo")
 trends_7_lag <- lag_8_df(trends_7, "empleo")
-trends_8_lag <- lag_8_df(trends_8, "comprar.carro")
+trends_8_lag <- lag_8_df(trends_8, "comprar_carro")
 trends_9_lag <- lag_8_df(trends_9, "préstamo")
-trends_10_lag <- lag_8_df(trends_10, "tiquetes.avion")
+trends_10_lag <- lag_8_df(trends_10, "tiquetes_avion")
 trends_11_lag <- lag_8_df(trends_11, "vacaciones")
-trends_12_lag <- lag_8_df(trends_12, "corte.agua")
-trends_13_lag <- lag_8_df(trends_13, "corte.de.agua")
-trends_14_lag <- lag_8_df(trends_14, "suspension.de.agua")
+trends_12_lag <- lag_8_df(trends_12, "corte_agua")
+trends_13_lag <- lag_8_df(trends_13, "corte_de_agua")
+trends_14_lag <- lag_8_df(trends_14, "suspension_de_agua")
+trends_15_lag <- lag_8_df(trends_15, "dengue")
 ```
-
-```{r}
-lags_prueba <- left_join(trends_1_lag, trends_4_lag, by = "week_canton")
-```
-
 
 ```{r}
 trends_lags <- left_join(trends_1_lag, trends_2_lag, by = "week_canton") |> 
@@ -307,7 +306,8 @@ trends_lags <- left_join(trends_1_lag, trends_2_lag, by = "week_canton") |>
   left_join(trends_11_lag, by = "week_canton") |> 
   left_join(trends_12_lag, by = "week_canton") |> 
   left_join(trends_13_lag, by = "week_canton") |> 
-  left_join(trends_14_lag, by = "week_canton")
+  left_join(trends_14_lag, by = "week_canton")|> 
+  left_join(trends_15_lag, by = "week_canton")
 ```
 
 ```{r}
