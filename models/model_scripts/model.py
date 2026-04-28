@@ -14,6 +14,7 @@ from sklearn.preprocessing import LabelBinarizer, LabelEncoder
 import joblib
 from xgboost import XGBRegressor
 from sklearn.inspection import permutation_importance
+from sklearn.feature_selection import RFECV
 
 class Model:
     def __init__(self, df):
@@ -86,7 +87,7 @@ class Model:
 
         elif momento == "mediano":
             df_temp = self.drop_lags(i = 1, f = 5, df_temp = df_temp)
-            for i in range(5, 9):
+            for i in range(1, 5):
                 df_temp.drop(columns = [f"casos_lag_{i}"], inplace = True)
         elif momento == "todos":
             pass
@@ -161,7 +162,7 @@ class Model:
 
         elif momento == "mediano":
             df_temp = self.drop_lags(i = 1, f = 5, df_temp = df_temp)
-            for i in range(5, 9):
+            for i in range(1, 5):
                 df_temp.drop(columns = [f"rr_lag_{i}"], inplace = True)
         elif momento == "todos":
             pass
@@ -222,7 +223,7 @@ class Model:
 
         return X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled
 
-    def partition_rr_classi(self, momento):
+    def partition_classi_rr(self, momento):
         df_temp = self.df.copy()
 
         df_temp.drop(columns=['casos'], inplace=True)
@@ -241,13 +242,13 @@ class Model:
 
         elif momento == "mediano":
             df_temp = self.drop_lags(i = 1, f = 5, df_temp = df_temp)
-            for i in range(5, 9):
+            for i in range(1, 5):
                 df_temp.drop(columns = [f"clasi_rr_lag_{i}"], inplace = True)
 
-            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_lag_1"])
-            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_lag_2"])
-            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_lag_3"])
-            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_lag_4"])
+            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_lag_5"])
+            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_lag_6"])
+            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_lag_7"])
+            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_lag_8"])
 
         elif momento == "todos":
             df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_lag_1"])
@@ -315,7 +316,7 @@ class Model:
 
         return X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled
 
-    def partition_rr_classi_no_0(self, momento):
+    def partition_classi_rr_no_0(self, momento):
         df_temp = self.df.copy()
 
         df_temp.drop(columns=['casos'], inplace=True)
@@ -334,13 +335,13 @@ class Model:
 
         elif momento == "mediano":
             df_temp = self.drop_lags(i = 1, f = 5, df_temp = df_temp)
-            for i in range(5, 9):
+            for i in range(1, 5):
                 df_temp.drop(columns = [f"clasi_rr_no_0_lag_{i}"], inplace = True)
 
-            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_no_0_lag_1"])
-            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_no_0_lag_2"])
-            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_no_0_lag_3"])
-            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_no_0_lag_4"])
+            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_no_0_lag_5"])
+            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_no_0_lag_6"])
+            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_no_0_lag_7"])
+            df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_no_0_lag_8"])
 
         elif momento == "todos":
             df_temp = pd.get_dummies(df_temp, columns = ["clasi_rr_no_0_lag_1"])
@@ -431,8 +432,12 @@ class Model:
         return coef_reg_sorted
 
     def importance_ml(self, var, X_train, X_test_for_reg, y_test_for_reg, model, model_type):
+        try:
+            effective_model = model.best_estimator_
+        except:
+            effective_model = model
 
-        r = permutation_importance(model.best_estimator_, X_test_for_reg, y_test_for_reg, n_repeats=30, random_state=0)
+        r = permutation_importance(effective_model, X_test_for_reg, y_test_for_reg, n_repeats=30, random_state=0)
 
         imp_df = pd.DataFrame({"Feature": X_train.columns[r.importances_mean.argsort()[::-1]], f"imp_{model_type}": r.importances_mean[r.importances_mean.argsort()[::-1]]})
 
@@ -440,13 +445,48 @@ class Model:
 
         fig, ax = plt.subplots(figsize=(10, 8))
         imp_df_sorted = imp_df.sort_values(by = f"imp_{model_type}", ascending=True)
-        ax.barh(imp_df_sorted["Feature"].head(10), imp_df_sorted[f"imp_{model_type}"].head(10))
+        ax.barh(imp_df_sorted["Feature"].tail(10), imp_df_sorted[f"imp_{model_type}"].tail(10))
         ax.bar_label(ax.containers[0], fmt='%.2f')
         ax.set_xlabel("Importance")
         fig.suptitle(f"{model_type} permutation importance for {var}")
         plt.show()
 
         return imp_df
+
+    def rfecv_selection(self, var, model_type, model, X_train, y_train):
+
+        rfecv = RFECV(
+            estimator=model,
+            step=1,
+            cv=5,
+            min_features_to_select=5,
+            n_jobs=-1
+        )
+
+        rfecv.fit(X_train, y_train)
+
+        print(f'Optimal number of features for {var} and {model_type}: {rfecv.n_features_}')
+        selected_rfe = [f for f, s in zip(X_train.columns.tolist(), rfecv.support_) if s]
+        print(f'Selected features: {selected_rfe}')
+
+        fig, ax = plt.subplots(figsize=(9, 4))
+        n_features_range = range(rfecv.min_features_to_select,
+                                rfecv.min_features_to_select + len(rfecv.cv_results_['mean_test_score']))
+        ax.plot(n_features_range, rfecv.cv_results_['mean_test_score'], linewidth=2, marker='o', markersize=4)
+        ax.fill_between(
+            n_features_range,
+            rfecv.cv_results_['mean_test_score'] - rfecv.cv_results_['std_test_score'],
+            rfecv.cv_results_['mean_test_score'] + rfecv.cv_results_['std_test_score'],
+            alpha=0.2
+        )
+        ax.axvline(rfecv.n_features_, linestyle='--', linewidth=2,
+                label=f'Optimal: {rfecv.n_features_} features')
+        ax.set_title(f'RFECV: Metric (AUC or) vs Number of Features {var} and {model_type}', pad=10)
+        ax.set_xlabel('Number of Features Selected')
+        ax.set_ylabel('Cross-Validated metric (AUC or)')
+        ax.legend()
+        plt.tight_layout()
+        plt.show()
 
     def linear_reg(self, var, momento, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
 
@@ -478,6 +518,8 @@ class Model:
         plt.show()
 
         coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
+
+        self.rfecv_selection(var = var, model_type = "Linear Regression", model = reg, X_train = X_train_scaled, y_train = y_train)
 
         return reg
 
@@ -524,7 +566,7 @@ class Model:
         fig.suptitle(f"RF real vs predicted for {var}")
         plt.show()
 
-        imp_rf = self.importance_ml(var = var, X_train = X_train, X_train_scaled = X_train, model = grid_rf)
+        imp_rf = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
 
         return grid_rf
 
@@ -572,17 +614,17 @@ class Model:
         fig.suptitle(f"XGB real vs predicted for {var}")
         plt.show()
 
-        imp_xgb = self.importance_ml(var = var, X_train = X_train, X_train_scaled = X_train, model = grid_xgb)
+        imp_xgb = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_xgb, model_type = "xgb")
 
         return grid_xgb
 
-    def roc_auc_metrics_log(self, class_of_interest, other_classes, y_score_reg, label_binarizer, y_onehot_test):
+    def roc_auc_metrics_log(self, var, class_of_interest, other_classes, y_score_reg, label_binarizer, y_onehot_test):
         class_id = np.flatnonzero(label_binarizer.classes_ == class_of_interest)[0]
 
         display = RocCurveDisplay.from_predictions(
             y_onehot_test[:, class_id],
             y_score_reg[:, class_id],
-            name=f"{class_of_interest} contra el resto en {var}",
+            name=f"{class_of_interest} contra el resto",
             curve_kwargs=dict(color="darkorange"),
             plot_chance_level=True,
             despine=True,
@@ -590,16 +632,16 @@ class Model:
         _ = display.ax_.set(
             xlabel="False Positive Rate",
             ylabel="True Positive Rate",
-            title=f"One-vs-Rest ROC curves:\n{class_of_interest} vs ({other_classes[0]} and {other_classes[1]})",
+            title=f"Logistic: One-vs-Rest ROC curves for {var}:\n{class_of_interest} vs ({other_classes[0]} and {other_classes[1]})",
         )
 
-    def roc_auc_metrics_rf(self, class_of_interest, other_classes, y_score_rf, label_binarizer, y_onehot_test):
+    def roc_auc_metrics_rf(self, var, class_of_interest, other_classes, y_score_rf, label_binarizer, y_onehot_test):
         class_id = np.flatnonzero(label_binarizer.classes_ == class_of_interest)[0]
 
         display = RocCurveDisplay.from_predictions(
             y_onehot_test[:, class_id],
             y_score_rf[:, class_id],
-            name=f"{class_of_interest} contra el resto en {var}",
+            name=f"{class_of_interest} contra el resto",
             curve_kwargs=dict(color="darkorange"),
             plot_chance_level=True,
             despine=True,
@@ -607,10 +649,10 @@ class Model:
         _ = display.ax_.set(
             xlabel="False Positive Rate",
             ylabel="True Positive Rate",
-            title=f"One-vs-Rest ROC curves:\n{class_of_interest} vs ({other_classes[0]} and {other_classes[1]})",
+            title=f"RF: One-vs-Rest ROC curves for {var}:\n{class_of_interest} vs ({other_classes[0]} and {other_classes[1]})",
         )
 
-    def roc_auc_metrics_xgb(var, class_of_interest, other_classes, y_score_xgb, label_binarizer, y_onehot_test):
+    def roc_auc_metrics_xgb(self, var, class_of_interest, other_classes, y_score_xgb, label_binarizer, y_onehot_test):
         classes = ["Alto", "Bajo", "Medio"]
 
         class_id = np.flatnonzero(label_binarizer.classes_ == class_of_interest)[0]
@@ -618,7 +660,7 @@ class Model:
         display = RocCurveDisplay.from_predictions(
             y_onehot_test[:, class_id],
             y_score_xgb[:, class_id],
-            name=f"{classes[class_of_interest]} contra el resto en {var}",
+            name=f"{classes[class_of_interest]} contra el resto",
             curve_kwargs=dict(color="darkorange"),
             plot_chance_level=True,
             despine=True,
@@ -626,10 +668,10 @@ class Model:
         _ = display.ax_.set(
             xlabel="False Positive Rate",
             ylabel="True Positive Rate",
-            title=f"One-vs-Rest ROC curves:\n{classes[class_of_interest]} vs ({classes[other_classes[0]]} and {classes[other_classes[1]]})",
+            title=f"XGB: One-vs-Rest ROC curves for {var}:\n{classes[class_of_interest]} vs ({classes[other_classes[0]]} and {classes[other_classes[1]]})",
         )
 
-    def log_reg(self, var, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
+    def log_reg(self, var, momento, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
         reg = LogisticRegression()
 
         reg.fit(X_train_scaled, y_train)
@@ -655,16 +697,14 @@ class Model:
 
         self.roc_auc_metrics_log(var, "Bajo", ["Alto", "Medio"], y_score_reg, label_binarizer, y_onehot_test)
 
-        self.roc_auc_metrics_log(var, "Medio", ["Alto", "Bajo"], y_score_reg)
+        self.roc_auc_metrics_log(var, "Medio", ["Alto", "Bajo"], y_score_reg, label_binarizer, y_onehot_test)
 
         cnf_matrix_reg = confusion_matrix(y_test_for_reg, y_pred_reg)
-
-        print(cnf_matrix_reg)
-
-        clasi = ["Alto", "Bajo", "Medio"]
-        disp = ConfusionMatrixDisplay(confusion_matrix=cnf_matrix_reg, display_labels = clasi).plot()
+        disp = ConfusionMatrixDisplay(confusion_matrix=cnf_matrix_reg, display_labels = ["Alto", "Bajo", "Medio"])
         disp.plot()
         disp.ax_.set_title(f"Logistic regression confusion matrix for {var}")
+
+        self.rfecv_selection(var = var, model_type = "Logistic Regression", model = reg, X_train = X_train_scaled, y_train = y_train)
 
         return reg
 
@@ -703,6 +743,8 @@ class Model:
         label_binarizer = LabelBinarizer().fit(y_train)
         y_onehot_test = label_binarizer.transform(y_test_for_reg)
 
+        print(classification_report(y_test_for_reg, y_pred_rf))
+
         self.roc_auc_metrics_rf(var, "Alto", ["Bajo", "Medio"], y_score_rf, label_binarizer, y_onehot_test)
 
         self.roc_auc_metrics_rf(var, "Bajo", ["Alto", "Medio"], y_score_rf, label_binarizer, y_onehot_test)
@@ -714,7 +756,7 @@ class Model:
         disp.plot()
         disp.ax_.set_title(f"RF confusion matrix for {var}")
 
-        imp_rf = self.importance_ml(var = var, X_train = X_train, X_train_scaled = X_train, model = grid_rf)
+        imp_rf = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
 
         return grid_rf
 
@@ -759,19 +801,21 @@ class Model:
 
         label_binarizer = LabelBinarizer().fit(y_train_encoded)
         y_onehot_test = label_binarizer.transform(y_test_encoded)
-        
-        self.roc_auc_metrics_xgb(0, [1, 2], y_score_xgb, label_binarizer, y_onehot_test)
-        
-        self. roc_auc_metrics_xgb(1, [0, 2], y_score_xgb, label_binarizer, y_onehot_test)
-    
-        self.roc_auc_metrics_xgb(2, [1, 0], y_score_xgb, label_binarizer, y_onehot_test)
 
-        cnf_matrix_xgb = confusion_matrix(y_test_for_reg, y_pred_xgb)
+        print(classification_report(y_test_encoded, y_pred_xgb))
+        
+        self.roc_auc_metrics_xgb(var, 0, [1, 2], y_score_xgb, label_binarizer, y_onehot_test)
+        
+        self. roc_auc_metrics_xgb(var, 1, [0, 2], y_score_xgb, label_binarizer, y_onehot_test)
+    
+        self.roc_auc_metrics_xgb(var, 2, [1, 0], y_score_xgb, label_binarizer, y_onehot_test)
+
+        cnf_matrix_xgb = confusion_matrix(y_test_encoded, y_pred_xgb)
         disp = ConfusionMatrixDisplay(confusion_matrix=cnf_matrix_xgb)
         disp.plot()
         disp.ax_.set_title(f"XGB confusion matrix for {var}")
 
-        imp_xgb = self.importance_ml(var = var, X_train = X_train, X_train_scaled = X_train, model = grid_xgb)
+        imp_xgb = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_xgb, model_type = "xgb")
 
         return grid_xgb
 
@@ -784,6 +828,8 @@ class Model:
 
             reg = self.linear_reg(var, momento, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
 
+            coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
+
             print("********** RF **********")
 
             grid_rf = self.rf_reg(var, momento, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
@@ -793,11 +839,13 @@ class Model:
             grid_xgb = self.xgb_reg(var, momento, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
 
         elif var == "rr":
-            X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_rr(self, momento)
+            X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_rr(momento)
 
             print("********** LINEAR REGRESSION **********")
 
             reg = self.linear_reg(var, momento, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+
+            coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
 
             print("********** RF **********")
 
@@ -807,12 +855,14 @@ class Model:
 
             grid_xgb = self.xgb_reg(var, momento, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
             
-        elif var == "classi":
-            X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_classi_rr(self, momento)
+        elif var in ["classi_rr", "clasi_rr"]:
+            X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_classi_rr(momento)
 
             print("********** LOGISTIC REGRESSION **********")
 
             reg = self.log_reg(var, momento, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+
+            coef_reg_sorted = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = reg, model_type = "logistic")
 
             print("********** RF **********")
 
@@ -822,8 +872,8 @@ class Model:
 
             grid_xgb = self.xgb_classi(var, momento, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
 
-        elif var == "classi_no_0":
-            X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_classi_rr_no_0(self, momento) 
+        elif var in ["classi_no_0", "clasi_no_0"]:
+            X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_classi_rr_no_0(momento) 
 
             print("********** LOGISTIC REGRESSION **********")
 
@@ -840,7 +890,7 @@ class Model:
         else:
             print("Invalid variable")
 
-        coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
+        coef_reg_sorted = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = reg, model_type = "logistic")
 
         imp_rf_df = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
         
