@@ -152,7 +152,7 @@ class Model:
         df_temp = self.df.copy()
 
         df_temp.drop(columns=['clasi_rr'], inplace=True)
-        df_temp.drop(columns = ["rr"], inplace = True)
+        df_temp.drop(columns = ["casos"], inplace = True)
         df_temp.drop(columns = ["clasi_rr_no_0"], inplace = True)
 
         if momento == "inmediato":
@@ -471,7 +471,7 @@ class Model:
 
         return imp_df
 
-    def rfecv_selection(self, var, model_type, model, X_train, y_train):
+    def rfecv_selection(self, var, model_type, model, X_train, y_train, X_test_for_reg, y_test_for_reg):
 
         rfecv = RFECV(
             estimator=model,
@@ -506,6 +506,20 @@ class Model:
         plt.tight_layout()
         plt.show()
 
+        feature_names = X_train.columns[rfecv.support_]
+
+        if model_type == "Linear Regression":
+            importance_scores  = rfecv.estimator_.coef_ * X_train[feature_names].std()
+        else:
+            importance_scores = permutation_importance(rfecv.estimator_, X_test_for_reg[feature_names], y_test_for_reg, n_repeats=30, random_state=0).importances_mean
+
+        df_importance = pd.DataFrame({'Feature': feature_names, 'Importance': importance_scores})
+        df_importance = df_importance.sort_values(by='Importance', ascending=True)
+
+        df_importance.plot(kind='barh', x='Feature', y='Importance', legend=False)
+        plt.title(f"Feature Importance Selected by RFECV for {model_type} model of {var}")
+        plt.show()
+
     def linear_reg(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
 
         reg = LinearRegression().fit(X_train_scaled, y_train)
@@ -538,7 +552,7 @@ class Model:
 
         coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
 
-        self.rfecv_selection(var = var, model_type = "Linear Regression", model = reg, X_train = X_train_scaled, y_train = y_train)
+        self.rfecv_selection(var = var, model_type = "Linear Regression", model = reg, X_train = X_train_scaled, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
 
         return reg
 
@@ -590,7 +604,7 @@ class Model:
 
         imp_rf = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
 
-        self.rfecv_selection(var = var, model_type = "RF Regression", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train)
+        self.rfecv_selection(var = var, model_type = "RF Regression", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
 
         return grid_rf
 
@@ -643,7 +657,7 @@ class Model:
 
         imp_xgb = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_xgb, model_type = "xgb")
 
-        self.rfecv_selection(var = var, model_type = "XGB Regression", model = grid_xgb.best_estimator_, X_train = X_train, y_train = y_train)
+        self.rfecv_selection(var = var, model_type = "XGB Regression", model = grid_xgb.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
 
         return grid_xgb
 
@@ -733,7 +747,7 @@ class Model:
         disp.plot()
         disp.ax_.set_title(f"Logistic regression confusion matrix for {var}")
 
-        self.rfecv_selection(var = var, model_type = "Logistic Regression", model = reg, X_train = X_train_scaled, y_train = y_train)
+        self.rfecv_selection(var = var, model_type = "Logistic Regression", model = reg, X_train = X_train_scaled, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
 
         return reg
 
@@ -787,7 +801,7 @@ class Model:
 
         imp_rf = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
 
-        self.rfecv_selection(var = var, model_type = "RF Classifier", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train)
+        self.rfecv_selection(var = var, model_type = "RF Classifier", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
 
         return grid_rf
 
@@ -846,9 +860,9 @@ class Model:
         disp.plot()
         disp.ax_.set_title(f"XGB confusion matrix for {var}")
 
-        imp_xgb = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_xgb, model_type = "xgb")
+        imp_xgb = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_encoded, model = grid_xgb, model_type = "xgb")
 
-        self.rfecv_selection(var = var, model_type = "XGB Classifier", model = grid_xgb.best_estimator_, X_train = X_train, y_train = y_train)
+        self.rfecv_selection(var = var, model_type = "XGB Classifier", model = grid_xgb.best_estimator_, X_train = X_train, y_train = y_train_encoded, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
 
         return grid_xgb
 
@@ -935,7 +949,12 @@ class Model:
 
         imp_rf_df = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
         
-        imp_xgb_df = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_xgb, model_type = "xgb")
+        if var in ["classi_rr", "clasi_rr", "classi_no_0", "clasi_no_0"]:
+            le = LabelEncoder()
+            y_test_for_reg_encoded = le.fit_transform(y_test_for_reg)
+            imp_xgb_df = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg_encoded, model = grid_xgb, model_type = "xgb")
+        else:
+            imp_xgb_df = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_xgb, model_type = "xgb")
 
         importances = pd.merge(coef_reg_sorted, imp_rf_df, on = "Feature")
         importances = pd.merge(importances, imp_xgb_df, on = "Feature")
