@@ -7,7 +7,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 import xgboost as xgb
 from sklearn.preprocessing import OrdinalEncoder
 import numpy as np
-from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import LabelBinarizer, label_binarize
 from sklearn.model_selection import GridSearchCV
 from xgboost import XGBClassifier
 from sklearn.preprocessing import LabelBinarizer, LabelEncoder
@@ -409,6 +409,111 @@ class Model:
 
         return X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled
 
+    def partition_zero(self, momento):
+        df_temp = self.df.copy()
+
+        df_temp["zeros"] = np.where(df_temp["casos"] == 0, 0, 1)
+
+        df_temp.drop(columns=['clasi_rr'], inplace=True)
+        df_temp.drop(columns=['rr'], inplace=True)
+        df_temp.drop(columns = ["casos"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_no_0"], inplace = True)
+
+        df_temp = self.drop_lags(i = 1, f = 9, df_temp = df_temp)
+        for i in range(1, 9):
+            df_temp.drop(columns = [f"rr_lag_{i}"], inplace = True)
+
+        if momento == "inmediato":
+            df_temp = self.drop_lags(i = 5, f = 9, df_temp = df_temp)
+            for i in range(5, 9):
+                df_temp.drop(columns = [f"clasi_rr_no_0_lag_{i}"], inplace = True)
+                df_temp["zeros_lag_{i}"] = np.where(df_temp["casos_lag_{i}"] == 0, 0, 1)
+
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_1"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_2"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_3"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_4"])
+
+        elif momento == "mediano":
+            df_temp = self.drop_lags(i = 1, f = 5, df_temp = df_temp)
+            for i in range(1, 5):
+                df_temp.drop(columns = [f"clasi_rr_no_0_lag_{i}"], inplace = True)
+                df_temp["zeros_lag_{i}"] = np.where(df_temp["casos_lag_{i}"] == 0, 0, 1)
+
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_5"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_6"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_7"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_8"])
+
+        elif momento == "todos":
+            for i in range(1, 9):
+                df_temp["zeros_lag_{i}"] = np.where(df_temp["casos_lag_{i}"] == 0, 0, 1)
+
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_1"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_2"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_3"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_4"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_5"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_6"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_7"])
+            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_8"])
+        else:
+            print("Error in partition_class: momento is not valid")
+
+        df_temp.drop(columns = ["casos_lag_1"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_lag_1"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_no_0_lag_1"], inplace = True)
+        df_temp.drop(columns = ["casos_lag_2"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_lag_2"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_no_0_lag_2"], inplace = True)
+        df_temp.drop(columns = ["casos_lag_3"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_lag_3"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_no_0_lag_3"], inplace = True)
+        df_temp.drop(columns = ["casos_lag_4"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_lag_4"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_no_0_lag_4"], inplace = True)
+        df_temp.drop(columns = ["casos_lag_5"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_lag_5"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_no_0_lag_5"], inplace = True)
+        df_temp.drop(columns = ["casos_lag_6"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_lag_6"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_no_0_lag_6"], inplace = True)
+        df_temp.drop(columns = ["casos_lag_7"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_lag_7"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_no_0_lag_7"], inplace = True)
+        df_temp.drop(columns = ["casos_lag_8"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_lag_8"], inplace = True)
+        df_temp.drop(columns = ["clasi_rr_no_0_lag_8"], inplace = True)
+
+        df_temp = pd.get_dummies(df_temp, columns = ["urb"])
+
+        train = df_temp[df_temp['week_canton'] < '2024-1-101']
+        val = df_temp[(df_temp['week_canton'] >= '2024-1-101') & (df_temp['week_canton'] < '2025-1-101')]
+        test = df_temp[df_temp['week_canton'] >= '2025-1-101']
+
+        X_train = train.drop(columns = ["zeros", "week_canton"])
+        y_train = train["zeros"]
+
+        X_val = val.drop(columns = ["zeros", "week_canton"])
+        y_val= val["zeros"]
+
+        X_test= test.drop(columns = ["zeros", "week_canton"])
+        y_test = test["zeros"]
+
+        scaler = StandardScaler()  
+
+        X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
+        X_val_scaled = pd.DataFrame(scaler.transform(X_val), columns=X_val.columns)  
+        X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
+
+        X_test_for_reg = pd.concat([X_val, X_test], axis=0)
+        y_test_for_reg = pd.concat([y_val, y_test], axis=0)
+        val_test = pd.concat([val, test], axis=0)
+
+        X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
+
+        return X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled
+
     def serie_temp_canton(self, var, model, momento, canton):
 
         results = pd.read_csv(f'../../data/model_results/{momento}/results_{var}_{model}_{momento}_{canton}.csv')
@@ -471,7 +576,7 @@ class Model:
 
         return imp_df
 
-    def rfecv_selection(self, var, model_type, model, X_train, y_train, X_test_for_reg, y_test_for_reg):
+    def rfecv_selection(self, var, model_type, model, X_train, y_train, X_test_for_reg, y_test_for_reg, canton, momento):
 
         rfecv = RFECV(
             estimator=model,
@@ -507,6 +612,21 @@ class Model:
         plt.show()
 
         feature_names = X_train.columns[rfecv.support_]
+
+        y_pred = rfecv.estimator_.predict(X_test_for_reg[feature_names])
+
+        # if canton != "full":
+        #     self.serie_temp_canton(var, model_type, momento, canton)
+        # else:
+        #     mae = mean_absolute_error(y_test_for_reg, y_pred)
+        #     rmse = root_mean_squared_error(y_test_for_reg, y_pred)
+
+        # print(f"""MAE reg: {round(mae, 3)}
+        # RMSE reg: {round(rmse, 3)}
+        #         """)
+        # if var == "rr":
+        #     nrmse = rmse / np.mean(y_test_for_reg)
+        #     print(f"nrmse: {round(nrmse, 2)}")
 
         if model_type == "Linear Regression":
             importance_scores  = rfecv.estimator_.coef_ * X_train[feature_names].std()
@@ -552,7 +672,7 @@ class Model:
 
         coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
 
-        self.rfecv_selection(var = var, model_type = "Linear Regression", model = reg, X_train = X_train_scaled, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
+        self.rfecv_selection(var = var, model_type = "Linear Regression", model = reg, X_train = X_train_scaled, y_train = y_train, _test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
 
         return reg
 
@@ -586,15 +706,19 @@ class Model:
 
         results_rf.to_csv(f'../../data/model_results/{momento}/results_{var}_rf_{momento}_{canton}.csv')
 
+        mae_rf = mean_absolute_error(y_test_for_reg, y_pred_rf)
+        rmse_rf = root_mean_squared_error(y_test_for_reg, y_pred_rf)
+
         if canton != "full":
             self.serie_temp_canton(var, "rf", momento, canton)
         else:
-            mae_rf = mean_absolute_error(y_test_for_reg, y_pred_rf)
-            rmse_rf = root_mean_squared_error(y_test_for_reg, y_pred_rf)
-
             print(f"""MAE rf: {round(mae_rf, 3)}
             RMSE rf: {round(rmse_rf, 3)}
                 """)
+        
+        if var == "rr":
+            nrmse_rf = rmse_rf / np.mean(y_test_for_reg)
+            print(f"nrmse: {round(nrmse_rf, 2)}")
 
         fig, ax = plt.subplots()
         ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
@@ -604,7 +728,7 @@ class Model:
 
         imp_rf = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
 
-        self.rfecv_selection(var = var, model_type = "RF Regression", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
+        self.rfecv_selection(var = var, model_type = "rf", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
 
         return grid_rf
 
@@ -657,11 +781,11 @@ class Model:
 
         imp_xgb = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_xgb, model_type = "xgb")
 
-        self.rfecv_selection(var = var, model_type = "XGB Regression", model = grid_xgb.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
+        self.rfecv_selection(var = var, model_type = "XGB Regression", model = grid_xgb.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
 
         return grid_xgb
 
-    def roc_auc_metrics_log(self, var, class_of_interest, other_classes, y_score_reg, label_binarizer, y_onehot_test):
+    def roc_auc_metrics_log(self, var, class_of_interest, y_score_reg, label_binarizer, y_onehot_test):
         class_id = np.flatnonzero(label_binarizer.classes_ == class_of_interest)[0]
 
         display = RocCurveDisplay.from_predictions(
@@ -675,10 +799,10 @@ class Model:
         _ = display.ax_.set(
             xlabel="False Positive Rate",
             ylabel="True Positive Rate",
-            title=f"Logistic: One-vs-Rest ROC curves for {var}:\n{class_of_interest} vs ({other_classes[0]} and {other_classes[1]})",
+            title=f"Logistic: One-vs-Rest ROC curves for {var}:\n{class_of_interest} vs el resto)",
         )
 
-    def roc_auc_metrics_rf(self, var, class_of_interest, other_classes, y_score_rf, label_binarizer, y_onehot_test):
+    def roc_auc_metrics_rf(self, var, class_of_interest, y_score_rf, label_binarizer, y_onehot_test):
         class_id = np.flatnonzero(label_binarizer.classes_ == class_of_interest)[0]
 
         display = RocCurveDisplay.from_predictions(
@@ -692,27 +816,38 @@ class Model:
         _ = display.ax_.set(
             xlabel="False Positive Rate",
             ylabel="True Positive Rate",
-            title=f"RF: One-vs-Rest ROC curves for {var}:\n{class_of_interest} vs ({other_classes[0]} and {other_classes[1]})",
+            title=f"RF: One-vs-Rest ROC curves for {var}:\n{class_of_interest} vs el resto",
         )
 
-    def roc_auc_metrics_xgb(self, var, class_of_interest, other_classes, y_score_xgb, label_binarizer, y_onehot_test):
-        classes = ["Alto", "Bajo", "Medio"]
+    def roc_auc_metrics_xgb(self, var, class_of_interest, y_score_xgb, y_true, class_index):
 
-        class_id = np.flatnonzero(label_binarizer.classes_ == class_of_interest)[0]
+        if len(np.unique(y_true)) < 2:
+            print(f"Skipping ROC for {class_of_interest}: only one class present")
+            return
+
+        y_true_binary = (y_true == class_index).astype(int)
+
+        if y_score_xgb.ndim == 1:
+            y_score_class = y_score_xgb
+        else:
+            y_score_class = y_score_xgb[:, class_index]
 
         display = RocCurveDisplay.from_predictions(
-            y_onehot_test[:, class_id],
-            y_score_xgb[:, class_id],
-            name=f"{classes[class_of_interest]} contra el resto",
+            y_true_binary,
+            y_score_class,
+            name=f"{class_of_interest} vs resto",
             curve_kwargs=dict(color="darkorange"),
             plot_chance_level=True,
             despine=True,
         )
-        _ = display.ax_.set(
+
+        display.ax_.set(
             xlabel="False Positive Rate",
             ylabel="True Positive Rate",
-            title=f"XGB: One-vs-Rest ROC curves for {var}:\n{classes[class_of_interest]} vs ({classes[other_classes[0]]} and {classes[other_classes[1]]})",
+            title=f"XGB: ROC One-vs-Rest for {var}\n{class_of_interest} vs resto",
         )
+
+        plt.show()
 
     def log_reg(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
         reg = LogisticRegression()
@@ -736,18 +871,26 @@ class Model:
 
         y_score_reg = reg.predict_proba(X_test_for_reg)
 
-        self.roc_auc_metrics_log(var, "Alto", ["Bajo", "Medio"], y_score_reg, label_binarizer, y_onehot_test)
+        known_classes = set(label_binarizer.classes_)
 
-        self.roc_auc_metrics_log(var, "Bajo", ["Alto", "Medio"], y_score_reg, label_binarizer, y_onehot_test)
+        classes = ["Alto", "Bajo","Medio"]
 
-        self.roc_auc_metrics_log(var, "Medio", ["Alto", "Bajo"], y_score_reg, label_binarizer, y_onehot_test)
+        for target in classes:
+            if target not in known_classes:
+                print(f"Skipping roc_auc_metrics_log for '{target}': not in training set")
+                continue
+
+            self.roc_auc_metrics_log(
+                var, target,
+                y_score_reg, label_binarizer, y_onehot_test
+            )
 
         cnf_matrix_reg = confusion_matrix(y_test_for_reg, y_pred_reg)
         disp = ConfusionMatrixDisplay(confusion_matrix=cnf_matrix_reg, display_labels = ["Alto", "Bajo", "Medio"])
         disp.plot()
         disp.ax_.set_title(f"Logistic regression confusion matrix for {var}")
 
-        self.rfecv_selection(var = var, model_type = "Logistic Regression", model = reg, X_train = X_train_scaled, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
+        self.rfecv_selection(var = var, model_type = "Logistic Regression", model = reg, X_train = X_train_scaled, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
 
         return reg
 
@@ -788,11 +931,19 @@ class Model:
 
         print(classification_report(y_test_for_reg, y_pred_rf))
 
-        self.roc_auc_metrics_rf(var, "Alto", ["Bajo", "Medio"], y_score_rf, label_binarizer, y_onehot_test)
+        known_classes = set(label_binarizer.classes_)
 
-        self.roc_auc_metrics_rf(var, "Bajo", ["Alto", "Medio"], y_score_rf, label_binarizer, y_onehot_test)
+        classes = ["Alto", "Bajo","Medio"]
 
-        self.roc_auc_metrics_rf(var,"Medio", ["Bajo", "Alto"], y_score_rf, label_binarizer, y_onehot_test)
+        for target in classes:
+            if target not in known_classes:
+                print(f"Skipping roc_auc_metrics_rf for '{target}': not in training set")
+                continue
+
+            self.roc_auc_metrics_rf(
+                var, target,
+                y_score_rf, label_binarizer, y_onehot_test
+            )
 
         cnf_matrix_rf = confusion_matrix(y_test_for_reg, y_pred_rf)
         disp = ConfusionMatrixDisplay(confusion_matrix=cnf_matrix_rf)
@@ -801,11 +952,17 @@ class Model:
 
         imp_rf = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
 
-        self.rfecv_selection(var = var, model_type = "RF Classifier", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
+        self.rfecv_selection(var = var, model_type = "RF Classifier", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
 
         return grid_rf
 
     def xgb_classi(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
+
+        classes_in_train = set(y_train)
+        mask = y_test_for_reg.isin(classes_in_train)
+
+        X_test_for_reg = X_test_for_reg.loc[mask]
+        y_test_for_reg = y_test_for_reg[mask]
 
         le = LabelEncoder()
         y_train_encoded = le.fit_transform(y_train)
@@ -816,16 +973,14 @@ class Model:
         param_grid_xgb = {
             'max_depth': [5],
             'learning_rate': [0.3],
-            'n_estimator': [50], 
-            "criterion": ["auc"],
-            "reg_lambda": [0],
+            'n_estimators': [50],
+            "reg_lambda": [0]
         }
 
         # param_grid_xgb = {
         #     'max_depth': [5, 6, 7, 8],
         #     'learning_rate': [0.3, 0.1, 0.05],
-        #     'n_estimator': [50, 100, 150], 
-        #     "criterion": ["auc", "logloss"],
+        #     'n_estimators': [50, 100, 150], 
         #     "reg_lambda": [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
         # }
 
@@ -834,26 +989,47 @@ class Model:
 
         y_pred_xgb = grid_xgb.predict(X_test_for_reg)
 
+        val_test_filtered = val_test.loc[mask]
+
         results_xgb = pd.DataFrame({
             'actual': y_test_encoded,   
             'pred': y_pred_xgb,
-            "week_canton": val_test["week_canton"].values
+            "week_canton": val_test_filtered["week_canton"].values
         })
 
         results_xgb.to_csv(f'../../data/model_results/{momento}/results_{var}_xgb_{momento}_{canton}.csv')
 
         y_score_xgb = grid_xgb.predict_proba(X_test_for_reg)
 
-        label_binarizer = LabelBinarizer().fit(y_train_encoded)
-        y_onehot_test = label_binarizer.transform(y_test_encoded)
+        n_classes = len(le.classes_)
+
+        if n_classes == 2:
+            y_true_global = y_test_encoded
+            y_score_global = y_score_xgb[:, 1]
+        else:
+            y_true_global = label_binarize(y_test_encoded, classes=range(n_classes))
+            y_score_global = y_score_xgb
 
         print(classification_report(y_test_encoded, y_pred_xgb))
-        
-        self.roc_auc_metrics_xgb(var, 0, [1, 2], y_score_xgb, label_binarizer, y_onehot_test)
-        
-        self.roc_auc_metrics_xgb(var, 1, [0, 2], y_score_xgb, label_binarizer, y_onehot_test)
-    
-        self.roc_auc_metrics_xgb(var, 2, [1, 0], y_score_xgb, label_binarizer, y_onehot_test)
+
+        for i, class_name in enumerate(le.classes_):
+
+            if n_classes == 2:
+                self.roc_auc_metrics_xgb(
+                    var,
+                    class_name,
+                    y_score_global,
+                    y_true_global,
+                    class_index=i
+                )
+            else:
+                self.roc_auc_metrics_xgb(
+                    var,
+                    class_name,
+                    y_score_global[:, i],
+                    y_true_global[:, i],
+                    class_index=i
+                )
 
         cnf_matrix_xgb = confusion_matrix(y_test_encoded, y_pred_xgb)
         disp = ConfusionMatrixDisplay(confusion_matrix=cnf_matrix_xgb)
@@ -862,9 +1038,22 @@ class Model:
 
         imp_xgb = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_encoded, model = grid_xgb, model_type = "xgb")
 
-        self.rfecv_selection(var = var, model_type = "XGB Classifier", model = grid_xgb.best_estimator_, X_train = X_train, y_train = y_train_encoded, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg)
+        self.rfecv_selection(var = var, model_type = "XGB Classifier", model = grid_xgb.best_estimator_, X_train = X_train,y_train = y_train_encoded, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_encoded,   canton = canton, momento = momento)
 
         return grid_xgb
+
+    def hybrid1(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
+        reg = LogisticRegression()
+
+        reg.fit(X_train_scaled, y_train)
+
+        y_pred_reg = reg.predict(X_test_for_reg_scaled)
+
+        results_reg = pd.DataFrame({
+            'actual': y_test_for_reg,   
+            'pred': y_pred_reg,
+            "week_canton": val_test["week_canton"].values
+        })
 
     def ticks_years_top(self, ax, n):
         [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n != 0]
