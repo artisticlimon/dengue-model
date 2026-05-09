@@ -518,7 +518,9 @@ class Model:
 
         results = pd.read_csv(f'../../data/model_results/{momento}/results_{var}_{model}_{momento}_{canton}.csv')
 
-        mse = ((results["pred"] - results["actual"])**2).mean() / (results["actual"] ).mean()
+        rmse = root_mean_squared_error(results["actual"], results["pred"])
+        mse = rmse ** 2
+        mae = mean_absolute_error(results["actual"], results["pred"])
 
         fig, ax = plt.subplots()
         ax.plot(results['week_canton'], results["actual"], label='Reales', marker='o')
@@ -528,7 +530,8 @@ class Model:
         ax.set_ylabel(f'{var}')
 
         ax.text(0.9, 0.75, f'MSE: {mse:.2f}', transform=ax.transAxes, ha='center', fontsize=12)
-        ax.text(0.9, 0.68, f'RMSE: {mse**0.5:.2f}', transform=ax.transAxes, ha='center', fontsize=12)
+        ax.text(0.9, 0.68, f'RMSE: {rmse:.2f}', transform=ax.transAxes, ha='center', fontsize=12)
+        ax.text(0.9, 0.55, f'MAE: {mae:.2f}', transform=ax.transAxes, ha='center', fontsize=12)
         ax.set_title(f"{model} for {canton}")
         plt.show()
     
@@ -645,6 +648,7 @@ class Model:
         reg = LinearRegression().fit(X_train_scaled, y_train)
 
         y_pred_reg = reg.predict(X_test_for_reg_scaled)
+        y_pred_train = reg.predict(X_train)
 
         results_reg = pd.DataFrame({
             'actual': y_test_for_reg,   
@@ -653,15 +657,24 @@ class Model:
         })
 
         results_reg.to_csv(f'../../data/model_results/{momento}/results_{var}_reg_{momento}_{canton}.csv')
+        
+        mae_reg = mean_absolute_error(y_test_for_reg, y_pred_reg)
+        rmse_reg = root_mean_squared_error(y_test_for_reg, y_pred_reg)
+        rmse_reg_train = root_mean_squared_error(y_train, y_pred_train)
 
         if canton != "full":
             self.serie_temp_canton(var, "reg", momento, canton)
         else:
-            mae_reg = mean_absolute_error(y_test_for_reg, y_pred_reg)
-            rmse_reg = root_mean_squared_error(y_test_for_reg, y_pred_reg)
-
             print(f"""MAE reg: {round(mae_reg, 3)}
             RMSE reg: {round(rmse_reg, 3)}
+                """)
+            
+        nrmse_reg = rmse_reg / np.mean(y_test_for_reg)
+        print(f"nrmse: {round(nrmse_reg, 2)}")
+
+        print(f"""
+            RMSE train reg: {round(rmse_reg_train, 3)}
+            MSE train reg: {round(rmse_reg_train ** 2, 3)}
                 """)
             
         fig, ax = plt.subplots()
@@ -670,33 +683,35 @@ class Model:
         fig.suptitle(f"Linear regression real vs predicted for {var}")
         plt.show()
 
-        coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
+        # coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
 
-        self.rfecv_selection(var = var, model_type = "Linear Regression", model = reg, X_train = X_train_scaled, y_train = y_train, _test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
+        # self.rfecv_selection(var = var, model_type = "Linear Regression", model = reg, X_train = X_train_scaled, y_train = y_train, _test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
 
         return reg
 
     def rf_reg(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
         rf = RandomForestRegressor(oob_score=True)
 
-        param_grid_rf = {
-            'max_depth': [5],
-            'min_samples_split': [10],
-            'ccp_alpha': [0], 
-            "criterion": ["squared_error"]
-        }
-
         # param_grid_rf = {
-        #     'max_depth': [5, 6, 7, 8],
-        #     'min_samples_split': [10, 100, 500],
-        #     'ccp_alpha': [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10], 
-        #     "criterion": ["squared_error", "absolute_error"]
+        #     'max_depth': [1, 2, 3],
+        #     "max_features": ["sqrt", "log2"],
+        #     'min_samples_split': [20, 30, 40],
+        #     'ccp_alpha': [0], 
+        #     "criterion": ["squared_error"]
         # }
+
+        param_grid_rf = {
+            'max_depth': [5, 6, 7, 8],
+            'min_samples_split': [10, 100, 500],
+            'ccp_alpha': [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10], 
+            "criterion": ["squared_error", "absolute_error"]
+        }
 
         grid_rf = GridSearchCV(estimator=rf, param_grid=param_grid_rf, cv = 5, n_jobs=-1, verbose=10)
         grid_rf.fit(X_train, y_train)
 
         y_pred_rf = grid_rf.predict(X_test_for_reg)
+        y_pred_train = grid_rf.predict(X_train)
 
         results_rf = pd.DataFrame({
             'actual': y_test_for_reg,   
@@ -708,6 +723,7 @@ class Model:
 
         mae_rf = mean_absolute_error(y_test_for_reg, y_pred_rf)
         rmse_rf = root_mean_squared_error(y_test_for_reg, y_pred_rf)
+        rmse_rf_train = root_mean_squared_error(y_train, y_pred_train)
 
         if canton != "full":
             self.serie_temp_canton(var, "rf", momento, canton)
@@ -715,10 +731,14 @@ class Model:
             print(f"""MAE rf: {round(mae_rf, 3)}
             RMSE rf: {round(rmse_rf, 3)}
                 """)
-        
-        if var == "rr":
-            nrmse_rf = rmse_rf / np.mean(y_test_for_reg)
-            print(f"nrmse: {round(nrmse_rf, 2)}")
+       
+        nrmse_rf = rmse_rf / np.mean(y_test_for_reg)
+        print(f"nrmse: {round(nrmse_rf, 2)}")
+
+        print(f"""
+            RMSE train rf: {round(rmse_rf_train, 3)}
+            MSE train rf: {round(rmse_rf_train ** 2, 3)}
+                """)
 
         fig, ax = plt.subplots()
         ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
@@ -726,9 +746,9 @@ class Model:
         fig.suptitle(f"RF real vs predicted for {var}")
         plt.show()
 
-        imp_rf = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
+        # imp_rf = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
 
-        self.rfecv_selection(var = var, model_type = "rf", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
+        # self.rfecv_selection(var = var, model_type = "rf", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
 
         return grid_rf
 
@@ -736,24 +756,25 @@ class Model:
 
         xgb = XGBRegressor()
 
-        param_grid_xgb = {
-            'max_depth': [5],
-            'learning_rate': [0.1],
-            'n_estimator': [50], 
-            "criterion": ["friednman_mse"]
-        }
-
         # param_grid_xgb = {
-        #     'max_depth': [5, 6, 7, 8],
-        #     'learning_rate': [0.1, 0.3, 0.05],
-        #     'n_estimator': [50, 100, 150], 
-        #     "criterion": ["friednman_mse", "squared_error"]
+        #     'max_depth': [5],
+        #     'learning_rate': [0.1],
+        #     'n_estimator': [50], 
+        #     "criterion": ["friednman_mse"]
         # }
+
+        param_grid_xgb = {
+            'max_depth': [5, 6, 7, 8],
+            'learning_rate': [0.1, 0.3, 0.05],
+            'n_estimator': [50, 100, 150], 
+            "criterion": ["friednman_mse", "squared_error"]
+        }
 
         grid_xgb = GridSearchCV(estimator=xgb, param_grid=param_grid_xgb, cv = 5, n_jobs=-1, verbose=0)
         grid_xgb.fit(X_train, y_train)
 
         y_pred_xgb = grid_xgb.predict(X_test_for_reg)
+        y_pred_train = grid_xgb.predict(X_train)
 
         results_xgb = pd.DataFrame({
             'actual': y_test_for_reg,   
@@ -763,14 +784,23 @@ class Model:
 
         results_xgb.to_csv(f'../../data/model_results/{momento}/results_{var}_xgb_{momento}_{canton}.csv')
 
+        mae_xgb = mean_absolute_error(y_test_for_reg, y_pred_xgb)
+        rmse_xgb = root_mean_squared_error(y_test_for_reg, y_pred_xgb)
+        rmse_rf_train = root_mean_squared_error(y_train, y_pred_train)
+
         if canton != "full":
             self.serie_temp_canton(var, "xgb", momento, canton)
         else:
-            mae_xgb = mean_absolute_error(y_test_for_reg, y_pred_xgb)
-            rmse_xgb = root_mean_squared_error(y_test_for_reg, y_pred_xgb)
-
             print(f"""MAE xgb: {round(mae_xgb, 3)}
             RMSE xgb: {round(rmse_xgb, 3)}
+                """)
+
+        nrmse_rf = rmse_xgb / np.mean(y_test_for_reg)
+        print(f"nrmse: {round(nrmse_rf, 2)}")
+
+        print(f"""
+            RMSE train rf: {round(rmse_rf_train, 3)}
+            MSE train xgb: {round(rmse_rf_train ** 2, 3)}
                 """)
 
         fig, ax = plt.subplots()
@@ -779,9 +809,9 @@ class Model:
         fig.suptitle(f"XGB real vs predicted for {var}")
         plt.show()
 
-        imp_xgb = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_xgb, model_type = "xgb")
+        # imp_xgb = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_xgb, model_type = "xgb")
 
-        self.rfecv_selection(var = var, model_type = "XGB Regression", model = grid_xgb.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
+        # self.rfecv_selection(var = var, model_type = "XGB Regression", model = grid_xgb.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
 
         return grid_xgb
 
@@ -890,7 +920,7 @@ class Model:
         disp.plot()
         disp.ax_.set_title(f"Logistic regression confusion matrix for {var}")
 
-        self.rfecv_selection(var = var, model_type = "Logistic Regression", model = reg, X_train = X_train_scaled, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
+        # self.rfecv_selection(var = var, model_type = "Logistic Regression", model = reg, X_train = X_train_scaled, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
 
         return reg
 
@@ -950,9 +980,9 @@ class Model:
         disp.plot()
         disp.ax_.set_title(f"RF confusion matrix for {var}")
 
-        imp_rf = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
+        # imp_rf = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
 
-        self.rfecv_selection(var = var, model_type = "RF Classifier", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
+        # self.rfecv_selection(var = var, model_type = "RF Classifier", model = grid_rf.best_estimator_, X_train = X_train, y_train = y_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
 
         return grid_rf
 
@@ -1036,24 +1066,200 @@ class Model:
         disp.plot()
         disp.ax_.set_title(f"XGB confusion matrix for {var}")
 
-        imp_xgb = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_encoded, model = grid_xgb, model_type = "xgb")
+        # imp_xgb = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_encoded, model = grid_xgb, model_type = "xgb")
 
-        self.rfecv_selection(var = var, model_type = "XGB Classifier", model = grid_xgb.best_estimator_, X_train = X_train,y_train = y_train_encoded, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_encoded,   canton = canton, momento = momento)
+        # self.rfecv_selection(var = var, model_type = "XGB Classifier", model = grid_xgb.best_estimator_, X_train = X_train,y_train = y_train_encoded, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_encoded,   canton = canton, momento = momento)
 
         return grid_xgb
 
-    def hybrid1(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
-        reg = LogisticRegression()
+    def hybrid(self, var, momento, canton, classi_type, reg_type, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
+        
+        y_train_bin = np.where(y_train > 0, 1, 0)
 
-        reg.fit(X_train_scaled, y_train)
+        if classi_type == "reg":
+            reg = LogisticRegression()
 
-        y_pred_reg = reg.predict(X_test_for_reg_scaled)
+            reg.fit(X_train_scaled, y_train_bin)
 
-        results_reg = pd.DataFrame({
+            y_pred_classi = reg.predict(X_test_for_reg_scaled)
+
+        elif classi_type == "rf":
+            rf = RandomForestClassifier(oob_score=True)
+
+            param_grid_rf = {
+                'max_depth': [5],
+                'min_samples_split': [10],
+                'ccp_alpha': [0], 
+                "criterion": ["gini"]
+            }
+
+            # param_grid_rf = {
+            #     'max_depth': [5, 6, 7, 8],
+            #     'min_samples_split': [10, 100, 500],
+            #     'ccp_alpha': [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10], 
+            #     "criterion": ["gini", "entropy"]
+            # }
+
+            grid_rf = GridSearchCV(estimator=rf, param_grid=param_grid_rf, cv = 5, n_jobs=-1, verbose=10)
+            grid_rf.fit(X_train, y_train_bin)
+
+            y_pred_classi = grid_rf.predict(X_test_for_reg)
+
+        elif classi_type == "xgb":
+            classes_in_train = set(y_train)
+            mask = y_test_for_reg.isin(classes_in_train)
+
+            X_test_for_reg = X_test_for_reg.loc[mask]
+            y_test_for_reg = y_test_for_reg[mask]
+
+            le = LabelEncoder()
+            y_train_encoded = le.fit_transform(y_train_bin)
+            y_test_encoded = le.transform(y_test_for_reg)
+
+            xgb = XGBClassifier()
+
+            param_grid_xgb = {
+                'max_depth': [5],
+                'learning_rate': [0.3],
+                'n_estimators': [50],
+                "reg_lambda": [0]
+            }
+
+            # param_grid_xgb = {
+            #     'max_depth': [5, 6, 7, 8],
+            #     'learning_rate': [0.3, 0.1, 0.05],
+            #     'n_estimators': [50, 100, 150], 
+            #     "reg_lambda": [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
+            # }
+
+            grid_xgb = GridSearchCV(estimator=xgb, param_grid=param_grid_xgb, cv = 5, n_jobs=-1, verbose=0)
+            grid_xgb.fit(X_train, y_train_encoded)
+
+            y_pred_classi = grid_xgb.predict(X_test_for_reg)
+
+        else: 
+            print("Invalid classification model")
+
+        if reg_type == "reg":
+            X_train_scaled_1 = X_train_scaled[y_train > 0]
+            y_train_1 = y_train[y_train > 0]
+
+            reg_model = LinearRegression().fit(X_train_scaled_1, y_train_1)
+
+            y_pred_reg = reg_model.predict(X_test_for_reg_scaled)
+        elif reg_type == "rf":
+            X_train_1 = X_train[y_train > 0]
+            y_train_1 = y_train[y_train > 0]
+
+            rf = RandomForestRegressor(oob_score=True)
+
+            param_grid_rf = {
+                'max_depth': [5],
+                'min_samples_split': [10],
+                'ccp_alpha': [0], 
+                "criterion": ["squared_error"]
+            }
+
+            # param_grid_rf = {
+            #     'max_depth': [5, 6, 7, 8],
+            #     'min_samples_split': [10, 100, 500],
+            #     'ccp_alpha': [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10], 
+            #     "criterion": ["squared_error", "absolute_error"]
+            # }
+
+            grid_rf = GridSearchCV(estimator=rf, param_grid=param_grid_rf, cv = 5, n_jobs=-1, verbose=10)
+            grid_rf.fit(X_train_1, y_train_1)
+
+            X_test_for_reg_1 = X_test_for_reg[y_pred_classi == 1]
+
+            y_pred_reg = grid_rf.predict(X_test_for_reg)
+
+            reg_model = grid_rf.best_estimator_
+        
+        elif reg_type == "xgb":
+            X_train_1 = X_train[y_train > 0]
+            y_train_1 = y_train[y_train > 0]
+
+            xgb = XGBRegressor()
+
+            param_grid_xgb = {
+                'max_depth': [5],
+                'learning_rate': [0.1],
+                'n_estimator': [50], 
+                "criterion": ["friednman_mse"]
+            }
+
+            # param_grid_xgb = {
+            #     'max_depth': [5, 6, 7, 8],
+            #     'learning_rate': [0.1, 0.3, 0.05],
+            #     'n_estimator': [50, 100, 150], 
+            #     "criterion": ["friednman_mse", "squared_error"]
+            # }
+
+            grid_xgb = GridSearchCV(estimator=xgb, param_grid=param_grid_xgb, cv = 5, n_jobs=-1, verbose=0)
+            
+            grid_xgb.fit(X_train_1, y_train_1)
+
+            X_test_for_reg_1 = X_test_for_reg[y_pred_classi == 1]
+
+            y_pred_reg = grid_xgb.predict(X_test_for_reg)
+
+            reg_model = grid_xgb.best_estimator_
+
+        else: 
+            print("Invalid regression model")
+
+        results = pd.DataFrame({
             'actual': y_test_for_reg,   
             'pred': y_pred_reg,
             "week_canton": val_test["week_canton"].values
         })
+
+        results.to_csv(f'../../data/model_results/{momento}/results_{var}_hybrid_{classi_type}_{reg_type}_{momento}_{canton}.csv')
+        
+        if reg_type == "reg":
+            y_pred_train = reg_model.predict(X_train_scaled)
+        else:
+            y_pred_train = reg_model.predict(X_train)
+
+        mae = mean_absolute_error(y_test_for_reg, y_pred_reg)
+        rmse = root_mean_squared_error(y_test_for_reg, y_pred_reg)
+        mse = rmse ** 2
+        rmse_train = root_mean_squared_error(y_train, y_pred_train)
+
+        if canton != "full":
+            self.serie_temp_canton(var, f"hybrid_{classi_type}_{reg_type}", momento, canton)
+        else:
+            print(f"""MAE: {round(mae, 3)}
+            RMSE: {round(rmse, 3)}
+                """)
+       
+        nrmse = rmse / np.mean(y_test_for_reg)
+        print(f"nrmse: {round(nrmse, 2)}")
+        print(f"""
+            MSE test: {round(mse, 3)}
+            RMSE test: {round(rmse, 3)}
+            RMSE train: {round(rmse_train, 3)}
+            MSE train: {round(rmse_train ** 2, 3)}
+                """)
+
+        # fig, ax = plt.subplots()
+        # ax.plot([min(y_test_for_reg), max(y_test_for_reg)], [min(y_test_for_reg), max(y_test_for_reg)], color='red', linestyle='--')
+        # ax.scatter(y_test_for_reg, y_pred_reg)
+        # fig.suptitle(f"hybrid_{classi_type}_{reg_type} real vs predicted for {var}")
+        # plt.show()
+
+        # if reg_type == "reg":
+        #     imp = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg_model)
+        # else: 
+        #     imp = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = reg_model, model_type = f"hybrid_{classi_type}_{reg_type}")
+
+        # if reg_type == "reg":
+        #     self.rfecv_selection(var = var, model_type = f"hybrid_{classi_type}_{reg_type}", model = reg_model, X_train = X_train_scaled_1, y_train = y_train_1, X_test_for_reg = X_test_for_reg_scaled, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
+        # else:
+        #     self.rfecv_selection(var = var, model_type = f"hybrid_{classi_type}_{reg_type}", model = reg_model, X_train = X_train_1, y_train = y_train_1, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
+
+        return reg_model
 
     def ticks_years_top(self, ax, n):
         [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n != 0]
@@ -1080,7 +1286,7 @@ class Model:
 
             grid_xgb = self.xgb_reg(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
 
-            coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
+            # coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
 
         elif var == "rr":
             X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_rr(momento)
@@ -1097,7 +1303,7 @@ class Model:
 
             grid_xgb = self.xgb_reg(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
 
-            coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
+            # coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
             
         elif var in ["classi_rr", "clasi_rr"]:
             X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_classi_rr(momento)
@@ -1114,7 +1320,7 @@ class Model:
 
             grid_xgb = self.xgb_classi(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
 
-            coef_reg_sorted = self.importance_ml(var = var, X_train = X_train_scaled, X_test_for_reg = X_test_for_reg_scaled, y_test_for_reg = y_test_for_reg, model = reg, model_type = "logistic")
+            # coef_reg_sorted = self.importance_ml(var = var, X_train = X_train_scaled, X_test_for_reg = X_test_for_reg_scaled, y_test_for_reg = y_test_for_reg, model = reg, model_type = "logistic")
 
         elif var in ["classi_no_0", "clasi_no_0"]:
             X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_classi_rr_no_0(momento) 
@@ -1131,26 +1337,26 @@ class Model:
 
             grid_xgb = self.xgb_classi(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
 
-            coef_reg_sorted = self.importance_ml(var = var, X_train = X_train_scaled, X_test_for_reg = X_test_for_reg_scaled, y_test_for_reg = y_test_for_reg, model = reg, model_type = "logistic")
+            # coef_reg_sorted = self.importance_ml(var = var, X_train = X_train_scaled, X_test_for_reg = X_test_for_reg_scaled, y_test_for_reg = y_test_for_reg, model = reg, model_type = "logistic")
             
         else:
             print("Invalid variable")
 
-        imp_rf_df = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
+        # imp_rf_df = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
         
-        if var in ["classi_rr", "clasi_rr", "classi_no_0", "clasi_no_0"]:
-            le = LabelEncoder()
-            y_test_for_reg_encoded = le.fit_transform(y_test_for_reg)
-            imp_xgb_df = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg_encoded, model = grid_xgb, model_type = "xgb")
-        else:
-            imp_xgb_df = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_xgb, model_type = "xgb")
+        # if var in ["classi_rr", "clasi_rr", "classi_no_0", "clasi_no_0"]:
+        #     le = LabelEncoder()
+        #     y_test_for_reg_encoded = le.fit_transform(y_test_for_reg)
+        #     imp_xgb_df = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg_encoded, model = grid_xgb, model_type = "xgb")
+        # else:
+        #     imp_xgb_df = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_xgb, model_type = "xgb")
 
-        importances = pd.merge(coef_reg_sorted, imp_rf_df, on = "Feature")
-        importances = pd.merge(importances, imp_xgb_df, on = "Feature")
+        # importances = pd.merge(coef_reg_sorted, imp_rf_df, on = "Feature")
+        # importances = pd.merge(importances, imp_xgb_df, on = "Feature")
 
-        cols_to_drop = ["index", "Coefficient", "Std"]
+        # cols_to_drop = ["index", "Coefficient", "Std"]
 
-        if all(col in importances.columns for col in cols_to_drop):
-            importances.drop(columns=cols_to_drop, inplace=True)
+        # if all(col in importances.columns for col in cols_to_drop):
+        #     importances.drop(columns=cols_to_drop, inplace=True)
 
-        importances.to_excel(f'../../data/model_results/feature_importance/imp_{var}_{momento}_{canton}.xlsx')
+        # importances.to_excel(f'../../data/model_results/feature_importance/imp_{var}_{momento}_{canton}.xlsx')
