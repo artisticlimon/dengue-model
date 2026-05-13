@@ -1,0 +1,55 @@
+```{r}
+library(dplyr)
+library(MODISTools)
+```
+```{r}
+setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw")
+```
+
+```{r}
+locations <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/locations_centroids.csv")
+
+locations <- locations |> select(site_name=canton,lat=lat,lon=lon)  
+```
+
+```{r}
+locations
+```
+
+```{r}
+fechas2020 <- c("2020-01-01", "2020-12-31")
+fechas2021 <- c("2021-01-01", "2021-12-31")
+fechas2022 <- c("2022-01-01", "2022-12-31")
+fechas2023 <- c("2023-01-01", "2023-12-31")
+fechas2024 <- c("2024-01-01", "2024-12-31")
+fechas2025 <- c("2025-01-01", "2025-12-31")
+```
+
+```{r}
+baseNDVI2020_full <- mt_batch_subset(df = locations,
+                    product = 'MOD13Q1',
+                    band = '250m_16_days_NDVI',
+                    start=fechas2020[1],
+                    end = fechas2020[2])
+```
+
+```{r}
+# save(baseNDVI2020_full, file = "baseNDVI2020_full.RData")
+```
+
+```{r}
+baseNDVI2021_full <- mt_batch_subset(df = locations,
+                       product = 'MOD13Q1',
+                band = '250m_16_days_NDVI',
+                start=fechas2021[1],
+                end = fechas2021[2])
+```
+
+```{r}
+save(baseNDVI2021_full, file = "baseNDVI2021_full.RData")
+```
+
+# LST
+
+
+

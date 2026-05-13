@@ -1,0 +1,237 @@
+```{r}
+library(lubridate)
+library(dplyr)
+library(tidyr)
+library(readxl)
+library(sf)
+library(gstat)
+```
+
+```{r}
+setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps")
+
+precip <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps/chirps_precip.csv")
+```
+
+```{r}
+precip$time = ymd(precip$time)
+```
+
+```{r}
+precip_weekly_site <- precip |> 
+  group_by(canton, year = isoyear(time), week1 = isoweek(time)) |>
+  summarise(precip_total = sum(precip),
+            precip_max = max(precip),
+            precip_min = min(precip),
+            precip_mean = mean(precip),
+            precip_median = median(precip),
+    .groups = "drop" )  |> 
+  mutate(week = paste(year, week1, sep = "-")) |> 
+  filter(!grepl("-53$", week)) |> 
+  filter(!grepl("2026-", week))
+```
+
+```{r}
+codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+
+codes <- codes |> 
+  select(ID, "PROVINCIA Y CANTON") |> 
+  filter(ID >= 101)
+
+colnames(codes) = c("ID", "canton")
+```
+
+```{r}
+codes[11, "canton"] = "VAZQUEZ DE CORONADO"
+codes[20, "canton"] = "LEON CORTES CASTRO"
+codes[31, "canton"] = "ZARCERO"
+codes[32, "canton"] = "SARCHI"
+```
+
+
+```{r}
+precip_weekly_site <- precip_weekly_site |> 
+   mutate(canton = toupper(canton)) |> 
+   mutate(canton = chartr("áéíóúñÁÉÍÓÚ", "aeiounAEIOU", canton)) 
+```
+
+```{r}
+precip_lon <- precip[!duplicated(precip$lon),] |> 
+  select(canton, lon)
+
+precip_lat <- precip[!duplicated(precip$lat),] |> 
+  select(canton, lat)
+
+precip_lon_lat <- left_join(precip_lon, precip_lat, by = "canton") |> 
+   mutate(canton = toupper(canton)) |> 
+   mutate(canton = chartr("áéíóúñÁÉÍÓÚ", "aeiounAEIOU", canton)) 
+```
+
+```{r}
+precip_weekly <- left_join(precip_weekly_site, codes, by = "canton") |> 
+  left_join(precip_lon_lat, by = "canton") |> 
+  select(-c(year, week1, canton))
+```
+
+```{r}
+precip_weekly 
+```
+
+```{r}
+for (i in 1:312) {
+  curr_week = unique(precip_weekly$week)[i]
+  df_int <- precip_weekly |> 
+  filter(week == curr_week)
+
+  coop <- st_as_sf(df_int, coords = c("lon", "lat"), crs = 4326)
+
+  coop <- coop |> 
+    filter(ID == 607) |> 
+    select(precip_total, ID)
+
+  precip_ap <- df_int |> 
+    filter(!is.na(precip_total))|> 
+    st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE) 
+
+  res <- gstat(formula = precip_total ~ 1, locations = precip_ap, nmax = 5, set = list(idp = 0))
+
+  golfito <- predict(res, coop, debug.level = 0)
+
+  precip_weekly$precip_total[precip_weekly$week == curr_week & precip_weekly$ID == 607] =   golfito$var1.pred
+}
+```
+```{r}
+for (i in 1:312) {
+  curr_week = unique(precip_weekly$week)[i]
+  df_int <- precip_weekly |> 
+  filter(week == curr_week)
+
+  coop <- st_as_sf(df_int, coords = c("lon", "lat"), crs = 4326)
+
+  coop <- coop |> 
+    filter(ID == 607) |> 
+    select(precip_max, ID)
+
+  precip_ap <- df_int |> 
+    filter(!is.na(precip_max))|> 
+    st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE) 
+
+  res <- gstat(formula = precip_max ~ 1, locations = precip_ap, nmax = 5, set = list(idp = 0))
+
+  golfito <- predict(res, coop, debug.level = 0)
+
+  precip_weekly$precip_max[precip_weekly$week == curr_week & precip_weekly$ID == 607] =   golfito$var1.pred
+}
+```
+
+```{r}
+for (i in 1:312) {
+  curr_week = unique(precip_weekly$week)[i]
+  df_int <- precip_weekly |> 
+  filter(week == curr_week)
+
+  coop <- st_as_sf(df_int, coords = c("lon", "lat"), crs = 4326)
+
+  coop <- coop |> 
+    filter(ID == 607) |> 
+    select(precip_min, ID)
+
+  precip_ap <- df_int |> 
+    filter(!is.na(precip_total))|> 
+    st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE) 
+
+  res <- gstat(formula = precip_total ~ 1, locations = precip_ap, nmax = 5, set = list(idp = 0))
+
+  golfito <- predict(res, coop, debug.level = 0)
+
+  precip_weekly$precip_min[precip_weekly$week == curr_week & precip_weekly$ID == 607] =   golfito$var1.pred
+}
+```
+
+```{r}
+for (i in 1:312) {
+  curr_week = unique(precip_weekly$week)[i]
+  df_int <- precip_weekly |> 
+  filter(week == curr_week)
+
+  coop <- st_as_sf(df_int, coords = c("lon", "lat"), crs = 4326)
+
+  coop <- coop |> 
+    filter(ID == 607) |> 
+    select(precip_mean, ID)
+
+  precip_ap <- df_int |> 
+    filter(!is.na(precip_mean))|> 
+    st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE) 
+
+  res <- gstat(formula = precip_mean ~ 1, locations = precip_ap, nmax = 5, set = list(idp = 0))
+
+  golfito <- predict(res, coop, debug.level = 0)
+
+  precip_weekly$precip_mean[precip_weekly$week == curr_week & precip_weekly$ID == 607] =   golfito$var1.pred
+}
+```
+
+
+```{r}
+for (i in 1:312) {
+  curr_week = unique(precip_weekly$week)[i]
+  df_int <- precip_weekly |> 
+  filter(week == curr_week)
+
+  coop <- st_as_sf(df_int, coords = c("lon", "lat"), crs = 4326)
+
+  coop <- coop |> 
+    filter(ID == 607) |> 
+    select(precip_median, ID)
+
+  precip_ap <- df_int |> 
+    filter(!is.na(precip_median))|> 
+    st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE) 
+
+  res <- gstat(formula = precip_median ~ 1, locations = precip_ap, nmax = 5, set = list(idp = 0))
+
+  golfito <- predict(res, coop, debug.level = 0)
+
+  precip_weekly$precip_median[precip_weekly$week == curr_week & precip_weekly$ID == 607] =   golfito$var1.pred
+}
+```
+
+```{r}
+precip_weekly = precip_weekly |> 
+  select(precip_total, precip_max, precip_min, precip_mean, precip_median, week, ID)
+```
+
+```{r}
+para_eda <- function(df, var) {
+  df_new <- df |> 
+    select(c(week, ID, var)) |>
+    pivot_wider(names_from = ID, values_from = var, id_cols = week)
+  write.csv(df_new, file = paste0("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/", var, "_eda.csv"))
+}
+```
+
+```{r}
+para_eda(precip_weekly, "precip_total")
+
+para_eda(precip_weekly, "precip_min")
+
+para_eda(precip_weekly, "precip_max")
+
+para_eda(precip_weekly, "precip_mean")
+
+para_eda(precip_weekly, "precip_median")
+```
+
+
+```{r}
+precip_weekly <- precip_weekly  |> 
+  mutate(week_canton = paste(week, ID, sep = "-")) |> 
+  select(precip_total, precip_max, precip_min, precip_mean, precip_median, week_canton)
+```
+
+```{r}
+write.csv(precip_weekly, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/precip_weekly.csv")
+```
+
+
