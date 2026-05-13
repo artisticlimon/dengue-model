@@ -1,0 +1,127 @@
+---
+title: "Análisis Exploratorio de las variables"
+output: 
+  pdf_document:
+    includes:
+      toc: true
+      toc_float: true 
+      collapsed: false 
+date: "2026-03-23"
+bibliography: "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/dengue-model.bib"
+csl: "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/apa.csl"
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{xcolor}
+  - \usepackage[spanish]{babel}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message =  FALSE, echo = FALSE, results = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tibble)
+options(kableExtra.latex.load_packages = FALSE)
+library(kableExtra)
+options(knitr.table.format = "latex")
+```
+
+```{r, fig.align='center', out.width='98%', out.height='95%', fig.cap="Distribución de los casos de dengue por provincia."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de los casos de dengue por provincia.png")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución de los casos de dengue por cantón."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de los casos de dengue por cantón.png")
+```
+
+```{r, fig.align='center', out.width='85%', out.height='80%', fig.cap="Serie de tiempo para los casos totales y por provincia de dengue en Costa Rica, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Serie de tiempo para los casos totales y por provincia de dengue en Costa Rica, 2020-2025.png")
+```
+
+```{r, fig.align='center', out.width='90%', out.height='40%', fig.cap="Crecimiento de la población total de Costa Rica (proyecciones al 30 de junio), 2019-2026."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Crecimiento de la población total de Costa Rica (proyecciones al 30 de junio), 2019-2026.png")
+```
+
+```{r, fig.align='center', out.width='90%', out.height='40%', fig.cap="Población de los distintos cantones de Costa Rica, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Población de los distintos cantones de Costa Rica, 2020-2025.png")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución del riesgo relativo por cantón (datos completos)."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución del riesgo relativo por cantón (datos completos).png")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución del riesgo relativo por cantón (datos sin ceros)."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución del riesgo relativo por cantón (datos sin ceros).png")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución de la precipitación total por cantón."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de la precipitación total por cantón.png")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Serie de tiempo para la precipitación total y según cantón más lluvioso, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Serie de tiempo para la precipitación total y según cantón más lluvioso, 2020-2025.png")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Mediana de la precipitación semanal según cantón más lluvioso, 2020-2025."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Mediana de la precipitación total según cantón más lluvioso, 2020-2025.png")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución de la temperatura máxima máxima por cantón."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de la temperatura máxima máxima por cantón.png")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución de la temperatura mínima mínima por cantón."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Distribución de la temperatura mínima mínima por cantón.png")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Serie de tiempo para la temperatura máxima máxima y según cantón más caliente 2020-2025."}
+knitr::include_graphics(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Serie de tiempo para la temperatura máxima máxima y según cantón más caliente 2020-2025.png)")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Serie de tiempo para la temperatura mínima mínima y según cantón más frío 2020-2025."}
+knitr::include_graphics(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Serie de tiempo para la temperatura mínima mínima y según cantón más frío, 2020-2025.png)")
+```
+
+```{r, fig.align='center', out.width='80%', out.height='40%', fig.cap="Comportamiento del NDVI en el cantón central de San José, 2020-2025."}
+knitr::include_graphics(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Comportamiento del NDVI en el cantón central de San José, 2020-2025.png)")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Distribución del NDVI según cantón, 2020-2025."}
+knitr::include_graphics(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Distribución del NDVI según cantón, 2020-2025.png)")
+```
+
+```{r, fig.align='center', out.width='95%', out.height='95%', fig.cap="Series de tiempo según cantón de la provincia con mayor NDVI, 2020-2025."}
+knitr::include_graphics(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Series de tiempo según cantón de la provincia con mayor NDVI, 2020-2025.png)")
+```
+
+```{r, fig.align='center', out.width='80%', out.height='40%', fig.cap="Comportamiento del SST mensual en Costa Rica, 2020-2025."}
+knitr::include_graphics(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Comportamiento del SST mensual en Costa Rica, 2020-2025.png)")
+```
+
+```{r, fig.align='center', out.width='60%', out.height='30%', fig.cap="Grado de urbanización de los cantones de Costa Rica, 2022."}
+knitr::include_graphics(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Grado de urbanización de los cantones de Costa Rica, 2022.png)")
+```
+
+```{r, fig.align='center', out.width='98%', out.height='80%', fig.cap="Comportamiento del interés de búsqueda a través del tipo según provincia y categoría."}
+knitr::include_graphics(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Comportamiento del interés de búsqueda a través del tipo según provincia y categoría.png)")
+```
+
+```{r, fig.align='center', out.width='98%', out.height='80%', fig.cap="Comportamiento del interés de búsqueda a través del tipo según provincia y frase."}
+knitr::include_graphics(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\eda\figures\Comportamiento del interés de búsqueda a través del tipo según provincia y frase.png)")
+```
+
+```{r, fig.align='center', out.width='60%', out.height='50%', fig.cap="Cantones con campañas de prevención (todo tipo), 2020-2025.png."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Cantones con campañas de prevención (todo tipo), 2020-2025.png")
+```
+
+```{r, fig.align='center', out.width='98%', out.height='35%', fig.cap="Porcentaje de días en los que se realizó cada tipo de campaña.png."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Porcentaje de días en los que se realizó cada tipo de campaña.png")
+```
+
+```{r, fig.align='center', out.width='98%', out.height='42%', fig.cap="Meses con campañas de prevención (todo tipo), 2020-2025.png."}
+knitr::include_graphics("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/eda/figures/Meses con campañas de prevención (todo tipo), 2020-2025.png")
+```
+
+
