@@ -52,6 +52,7 @@ campa_raw <- campa_raw |>
 ```
 
 ```{r}
+# Use canton code instead of canton name
 codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
 
 codes <- codes |> 
@@ -73,9 +74,6 @@ campa <- left_join(campa_raw, codes, by = "canton2") |>
 write.csv(campa, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/campaigns_eda.csv")
 ```
 
-```{r}
-round(100 * mean(campa_map$presencia), 1)
-```
 
 
 
