@@ -1,3 +1,5 @@
+This file consists of the time series, spatial, and linear interpolation of variables. This is necessary because of weekly granularity and missing Golfito data.
+
 ```{r}
 library(imputeTS)
 library(lubridate)

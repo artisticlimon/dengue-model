@@ -1,3 +1,5 @@
+This file calculates the 8th week lags for each variable.
+
 ```{r}
 library(dplyr)
 library(tidyr)

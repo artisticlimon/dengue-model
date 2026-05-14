@@ -1,3 +1,4 @@
+This file returns the campaign dataset with the most important variables being type, canton ID, and week.
 ```{r}
 library(dplyr)
 library(lubridate)
