@@ -8,11 +8,26 @@ library(tidyr)
 library(readr)
 library(sf)
 library(gstat)
+library(naniar)
 ```
 # Functions
 
 ```{r}
 interpolate <- function(df_small, first_day, last_day) {
+
+#  Function that interpolates using a linear method. It interpolates daily first and then chooses the week's Wednesday. 
+
+# Parameters
+#  ----
+#  df_small: dataframe
+#    dataframe with data that needs to be interpolated
+
+#  first_day, last_day: Date
+#    First and last day of the period in which to interpolate
+
+#  Returns
+#  ----
+#  df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
   
   days = seq(first_day, last_day, by = "days")
 
@@ -35,6 +50,7 @@ interpolate <- function(df_small, first_day, last_day) {
   filter(fecha %in% weeks_date) %>% 
   select(1:ncol(df_int))
   
+  # Remove week 53 to standardize number of weeks in a year
   df_filter_weeks <- df_filter_weeks |> 
   mutate(year = isoyear(fecha)) |> 
   filter(year %in% c(2020, 2021, 2022, 2023, 2024, 2025)) |> 
@@ -52,6 +68,20 @@ interpolate <- function(df_small, first_day, last_day) {
 }
 
 interpolate_ndvi <- function(df_small, first_day, last_day) {
+
+#  Function that interpolates using time series interpolation. It interpolates daily first and then chooses the week's Wednesday. 
+
+# Parameters
+#  ----
+#  df_small: dataframe
+#    dataframe with data that needs to be interpolated
+
+#  first_day, last_day: Date
+#    First and last day of the period in which to interpolate
+
+#  Returns
+#  ----
+#  df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
   
   days = seq(first_day, last_day, by = "days")
 
@@ -78,6 +108,7 @@ interpolate_ndvi <- function(df_small, first_day, last_day) {
   filter(fecha %in% weeks_date) %>% 
   select(1:ncol(df_int))
   
+  # Remove week 53 to standardize number of weeks in a year
   df_filter_weeks <- df_filter_weeks |> 
   mutate(year = isoyear(fecha)) |> 
   filter(year %in% c(2020, 2021, 2022, 2023, 2024, 2025)) |> 
@@ -94,34 +125,21 @@ interpolate_ndvi <- function(df_small, first_day, last_day) {
   return(df_filter_weeks)
 }
 
-interpolate_lst <- function(df_small, first_day, last_day) {
-  
-  days = seq(first_day, last_day, by = "days")
-
-  df1  <- tibble(fecha = days)
-  
-  df <- left_join(df1, df_small, by = "fecha")
-
-  num_cols <- setdiff(names(df), "fecha")
-  X <- as.matrix(df[num_cols])
-
-  X_imp <- matrix(nrow = nrow(X), ncol = ncol(X))
-  colnames(X_imp) <- num_cols
-
-  for (j in seq_len(ncol(X))) {
-    x_ts <- ts(X[, j], frequency = 365)
-    X_imp[, j] <- na_seadec(x_ts, algorithm = "interpolation")
-  }
-
-  df_int <- as_tibble(X_imp, .names = num_cols) |>
-    bind_cols(fecha = df$fecha)
-  
-  return(df_int)
-}
-```
-
-```{r}
 canton_week <- function(df, var_name) {
+#  Function that takes a dataframe and changes it to the format of having week-canton pairs as rows
+
+# Parameters
+#  ----
+#  df: dataframe
+#    dataframe with weeks as rows and cantons as columns
+
+#  var_name: string
+#    feature that will be contained in the resulting dataset
+
+#  Returns
+#  ----
+#  df_pivot: dataframe with week-canton pairs as rows and the values of the chosen feature
+
   df_pivot = pivot_longer(df, cols = -c("week"), names_to = "code", values_to = var_name)
   df_pivot <- df_pivot |> 
     mutate(week_canton = paste(week, code, sep = "-")) |> 
@@ -136,10 +154,12 @@ canton_week <- function(df, var_name) {
 pobs = read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/pob_anual.xlsx")
 ```
 ```{r}
+# Transpose so cantons are the columns and the rows are the years
 pobs_t = t(pobs)
 ```
 
 ```{r}
+# Delete totals for the country, provinces, unknown and foreign cases
 pobs_t = data.frame(pobs_t)
 colnames(pobs_t) = pobs_t[1,1:ncol(pobs_t)]
 pobs_t = pobs_t[-c(1, 2, 11, 12, 13), 1:ncol(pobs_t)]
@@ -179,38 +199,31 @@ baseNDVI <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta p
 baseNDVI <- baseNDVI |> 
   mutate(fecha = ymd(fecha)) |>
   mutate(ndvi1 = case_when(
-  ndvi < 0 ~ NA,
+  ndvi < 0 ~ NA, # Values of 0 indicate that the real value is missing
   TRUE ~ ndvi  
 )) |> 
   select(ndvi = ndvi1, fecha, ID)
 ```
 
 ```{r}
-which(is.na(baseNDVI$ndvi) & baseNDVI$ID != 607) # Todos los NA son Golfito
-```
-
-
-```{r}
+# Transpose so cantons are the columns and the rows are the date
 baseNDVI_wide <- pivot_wider(baseNDVI, names_from = ID, values_from =  ndvi)
 ```
 
 ```{r}
-baseNDVI_wide
-```
-
-```{r}
 baseNDVI_int <- baseNDVI_wide |> 
-  select(-"607") |> 
+  select(-"607") |> # Delete Golfito because all the values are missing
   interpolate_ndvi(first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31")) 
 ```
 
 ```{r}
-baseNDVI_int$"607" <- rep(NA, 312)
+baseNDVI_int$"607" <- rep(NA, 312) # Create Golfito column to impute the data later
 baseNDVI_int_long <- pivot_longer(baseNDVI_int, cols = c(-(week))) |> 
   select(week, ID = name, ndvi = value)
 ```
 
 ```{r}
+# Use precipitation dataset for spatial imputation because it contains the coordinates for each canton, which are needed for this imputation
 precip <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps/chirps_precip.csv")
 ```
 
@@ -219,6 +232,7 @@ precip$time = ymd(precip$time)
 ```
 
 ```{r}
+# One value of total precipitation per week
 precip_weekly_site <- precip |> 
   group_by(canton, year = isoyear(time), week1 = isoweek(time)) |>
   summarise(precip_total = sum(precip),
@@ -229,6 +243,7 @@ precip_weekly_site <- precip |>
 ```
 
 ```{r}
+# This is done to change the canton names to its code in the precipitation dataset
 codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
 
 codes <- codes |> 
@@ -252,6 +267,7 @@ precip_weekly_site <- precip_weekly_site |>
 ```
 
 ```{r}
+# Choose only one value for each canton
 precip_lon <- precip[!duplicated(precip$lon),] |> 
   select(canton, lon)
 
@@ -264,18 +280,21 @@ precip_lon_lat <- left_join(precip_lon, precip_lat, by = "canton") |>
 ```
 
 ```{r}
+# Change canton names to canton codes
 precip_weekly <- left_join(precip_weekly_site, codes, by = "canton") |> 
   left_join(precip_lon_lat, by = "canton") |> 
   select(-c(year, week1, canton))
 ```
 
 ```{r}
+# Join NDVI base to obtain coords
 baseNDVI_int_long$ID <- as.numeric(baseNDVI_int_long$ID)
 baseNDVI_int_long_precip <- left_join(baseNDVI_int_long, precip_weekly, by = c("week", "ID")) |> 
   select(-precip_total)
 ```
 
 ```{r}
+# Spatial imputation
 for (i in 1:312) {
   curr_week = unique(baseNDVI_int_long_precip$week)[i]
   df_int <- baseNDVI_int_long_precip |> 
@@ -300,6 +319,7 @@ for (i in 1:312) {
 ```
 
 ```{r}
+# Create dataset for EDA report
 baseNDVI_eda <- baseNDVI_int_long_precip |> 
   select(-lon, -lat) |> 
   pivot_wider(id_cols = "week", names_from = -c("week", "ndvi"), values_from = "ndvi")
@@ -310,6 +330,7 @@ write.csv(baseNDVI_eda, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuent
 ```
 
 ```{r}
+# Create dataset for integration
 baseNDVI_pivot <- canton_week(baseNDVI_eda, "ndvi")
 ```
 
@@ -317,97 +338,16 @@ baseNDVI_pivot <- canton_week(baseNDVI_eda, "ndvi")
 write.csv(baseNDVI_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/NDVI_int.csv")
 ```
 
-# LST
-
-```{r}
-baseLST <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseLST.csv")
-baseLST <- baseLST |> 
-  mutate(fecha = ymd(fecha)) |>
-  mutate(lst1 = case_when(
-  lst < 0 ~ NA,
-  TRUE ~ lst  
-)) |> 
-  select(lst1, fecha, ID) 
-```
-
-```{r}
-baseLST_wide <- pivot_wider(baseLST, names_from = ID, values_from =  lst1) 
-```
-
-```{r}
-baseLST_wide <-baseLST_wide |> 
-  select(-c("607"))
-```
-```{r}
-baseLST_int <- interpolate_lst(baseLST_wide, first_day = ymd("2020-01-01"), last_day = ymd("2025-12-31"))
-```
-
-```{r}
-baseLST_int_long <- baseLST_int |>  pivot_longer(cols = -c("fecha"), names_to = "ID", values_to = "lst")
-```
-
-```{r}
-baseLST_int_long
-```
-
-```{r}
-lst_weekly_site <- baseLST_int_long |> 
-  group_by(ID, year = isoyear(fecha), week1 = isoweek(fecha)) |>
-  summarise(lst_min = min(lst), 
-            lst_max = max(lst),
-            lst_mean = mean(lst),
-            lst_median = median(lst),
-    .groups = "drop" )  |> 
-  mutate(week = paste(year, week1, sep = "-")) |> 
-  filter(!grepl("-53$", week))|> 
-  filter(!grepl("^2026", week))
-```
-```{r}
-lst_weekly_site
-```
-```{r}
-lst_weekly <- lst_weekly_site |> 
-  select(-c(year, week1))
-```
-
-```{r}
-para_eda <- function(df, var) {
-  df_new <- df |> 
-    select(c(week, ID, var)) |>
-    pivot_wider(names_from = ID, values_from = var, id_cols = week)
-  write.csv(df_new, file = paste0("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/", var, "_eda.csv"))
-}
-```
-
-```{r}
-para_eda(lst_weekly, "lst_min")
-
-para_eda(lst_weekly, "lst_max")
-
-para_eda(lst_weekly, "lst_mean")
-
-para_eda(lst_weekly, "lst_median")
-```
-
-```{r}
-lst_weekly <- lst_weekly  |> 
-  mutate(week_canton = paste(week, ID, sep = "-")) |> 
-  select(-c(ID, week))
-```
-
-```{r}
-write.csv(lst_weekly, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/LST_int.csv")
-```
-
-
 # El Niño
 
 ## SST
 
 ```{r}
+# Get El Nino data
 baseSST1 <-
   read_table('https://www.cpc.ncep.noaa.gov/data/indices/ersst5.nino.mth.91-20.ascii')
 ```
+
 ```{r}
 baseSST1 <- baseSST1 |> 
   filter(YR %in% seq(2020, 2025)) |> 
@@ -424,13 +364,14 @@ baseSST1 <- baseSST1 |>
                           MON == 11~ "11",
                           MON == 12 ~ "12"))
 baseSST1 <- baseSST1 |> 
-  mutate(fecha1 = paste(YR, MON1, "15", sep = "-")) |> 
+  mutate(fecha1 = paste(YR, MON1, "15", sep = "-")) |>  # Choose day 15 as a dummy day so it can be converted to date and interpolated, as El Nino data is monthly
   mutate(fecha = ymd(fecha1)) |> 
   select(fecha = fecha,
          nino34ssta = ANOM_3)
 ```
 
 ```{r}
+# Convert data to EDA
 write.csv(baseSST1, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/SST_eda.csv")
 ```
 
@@ -439,15 +380,7 @@ baseSST_int <- interpolate_ndvi(baseSST1, first_day = ymd("2020-01-01"), last_da
 ```
 
 ```{r}
-baseSST_int  
-```
-
-```{r}
-colnames(baseSST_int)
-```
-
-
-```{r}
+# Get canton codes for SST
 codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
 
 codes <- codes |> 
@@ -455,15 +388,16 @@ codes <- codes |>
   filter(ID >= 101)
 
 colnames(codes) = c("ID", "site1")
+```
 
+```{r}
+# Create columns for each canton by repeating nino34ssta for that month, as we will use the same for the whole country
 cantones <- codes["ID"]
 
 cantones_vector <- cantones[[1]]
 
 cantones_vector = as.character(cantones_vector)
-```
 
-```{r}
 baseSST_int[cantones_vector] <- baseSST_int$nino34ssta
 
 baseSST_int <- baseSST_int |> 
@@ -471,6 +405,7 @@ baseSST_int <- baseSST_int |>
 ```
 
 ```{r}
+# Create for EDA
 write.csv(baseSST_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/SST_int_eda.csv")
 ```
 
@@ -481,43 +416,3 @@ baseSST_pivot <- canton_week(df = baseSST_int, var_name = "nino34ssta")
 ```{r}
 write.csv(baseSST_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/SST_int.csv")
 ```
-
-
-## TNA
-
-```{r}
-datosTNA1 <-
-  read_table(
-    'https://www.esrl.noaa.gov/psd/data/correlation/tna.data'
-  )
-```
-
-```{r}
-baseSST1 <- baseSST1 |> 
-  filter(YR %in% seq(2020, 2025)) |> 
-  mutate(MON1 = case_when(MON == 1 ~ "01", 
-                          MON == 2 ~ "02", 
-                          MON == 3 ~ "03", 
-                          MON == 4 ~ "04",
-                          MON == 5 ~ "05",
-                          MON == 6 ~ "06", 
-                          MON == 7 ~ "07", 
-                          MON == 8 ~ "08",
-                          MON == 9 ~ "09",
-                          MON == 10 ~ "10", 
-                          MON == 11~ "11",
-                          MON == 12 ~ "12"))
-baseSST1 <- baseSST1 |> 
-  mutate(fecha1 = paste(YR, MON1, "15", sep = "-")) |> 
-  mutate(fecha = ymd(fecha1)) |> 
-  select(c(fecha, ANOM, ANOM_1, ANOM_2, ANOM_3))
-```
-
-```{r}
-baseSST_int <- interpolate(baseSST1, first_day = ymd("2020-01-01"), last_day =  ymd("2026-12-31"))
-```
-
-```{r}
-baseSST_int
-```
-
