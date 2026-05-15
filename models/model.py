@@ -223,15 +223,10 @@ class Model:
 
         scaler = StandardScaler()  
 
-        X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
-        X_val_scaled = pd.DataFrame(scaler.transform(X_val), columns=X_val.columns)  
+        X_combined_scaled = pd.DataFrame(scaler.fit_transform(X_combined), columns=X_train.columns)
         X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
 
         X_test_for_reg = pd.concat([X_val, X_test], axis=0)
-        y_test_for_reg = pd.concat([y_val, y_test], axis=0)
-        val_test = pd.concat([val, test], axis=0)
-
-        X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
 
         return X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds
 
