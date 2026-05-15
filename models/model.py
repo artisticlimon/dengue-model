@@ -146,17 +146,10 @@ class Model:
 
         scaler = StandardScaler()  
 
-        X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
-        X_val_scaled = pd.DataFrame(scaler.transform(X_val), columns=X_val.columns)  
+        X_combined_scaled = pd.DataFrame(scaler.fit_transform(X_combined), columns=X_combined.columns)
         X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
 
-        X_test_for_reg = pd.concat([X_val, X_test], axis=0)
-        y_test_for_reg = pd.concat([y_val, y_test], axis=0)
-        val_test = pd.concat([val, test], axis=0)
-
-        X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
-
-        return X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds
+        return X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds
 
     def partition_rr(self, momento):
         df_temp = self.df.copy()
@@ -240,7 +233,7 @@ class Model:
 
         X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
 
-        return X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds
+        return X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds
 
     def partition_classi_rr(self, momento):
         df_temp = self.df.copy()
@@ -332,17 +325,10 @@ class Model:
 
         scaler = StandardScaler()  
 
-        X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
-        X_val_scaled = pd.DataFrame(scaler.transform(X_val), columns=X_val.columns)  
+        X_combined_scaled = pd.DataFrame(scaler.fit_transform(X_combined), columns=X_train.columns)
         X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
 
-        X_test_for_reg = pd.concat([X_val, X_test], axis=0)
-        y_test_for_reg = pd.concat([y_val, y_test], axis=0)
-        val_test = pd.concat([val, test], axis=0)
-
-        X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
-
-        return X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds
+        return X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds
 
     def partition_classi_rr_no_0(self, momento):
         df_temp = self.df.copy()
@@ -444,7 +430,7 @@ class Model:
 
         X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
 
-        return X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds
+        return X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds
 
     def serie_temp_canton(self, var, model, momento, canton):
 
@@ -575,24 +561,24 @@ class Model:
         plt.title(f"Feature Importance Selected by RFECV for {model_type} model of {var}")
         plt.show()
 
-    def linear_reg(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
+    def linear_reg(self, var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds):
 
-        reg = LinearRegression().fit(X_train_scaled, y_train)
+        reg = LinearRegression().fit(X_combined_scaled, y_combined)
 
-        y_pred_reg = reg.predict(X_test_for_reg_scaled)
-        y_pred_train = reg.predict(X_train_scaled)
+        y_pred_reg = reg.predict(X_test_scaled)
+        y_pred_train = reg.predict(X_combined_scaled)
 
         results_reg = pd.DataFrame({
-            'actual': y_test_for_reg,   
+            'actual': y_test,   
             'pred': y_pred_reg, 
-            "week_canton": val_test["week_canton"].values # FIX
+            "week_canton": test["week_canton"].values 
         })
 
         results_reg.to_csv(f'../../data/model_results/{momento}/results_{var}_reg_{momento}_{canton}.csv')
         
-        mae_reg = mean_absolute_error(y_test_for_reg, y_pred_reg)
-        rmse_reg = root_mean_squared_error(y_test_for_reg, y_pred_reg)
-        rmse_reg_train = root_mean_squared_error(y_train, y_pred_train)
+        mae_reg = mean_absolute_error(y_test, y_pred_reg)
+        rmse_reg = root_mean_squared_error(y_test, y_pred_reg)
+        rmse_reg_train = root_mean_squared_error(y_combined, y_pred_train)
 
         if canton != "full":
             self.serie_temp_canton(var, "reg", momento, canton)
@@ -601,7 +587,7 @@ class Model:
             RMSE reg: {round(rmse_reg, 3)}
                 """)
             
-        nrmse_reg = rmse_reg / np.mean(y_test_for_reg)
+        nrmse_reg = rmse_reg / np.mean(y_test)
         print(f"nrmse: {round(nrmse_reg, 2)}")
 
         print(f"""
@@ -611,7 +597,7 @@ class Model:
             
         fig, ax = plt.subplots()
         ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
-        ax.scatter(y_test_for_reg, y_pred_reg)
+        ax.scatter(y_test, y_pred_reg)
         fig.suptitle(f"Linear regression real vs predicted for {var}")
         plt.show()
 
@@ -621,7 +607,7 @@ class Model:
 
         return reg
 
-    def rf_reg(self, var, momento, canton, X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds):
+    def rf_reg(self, var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds):
         rf = RandomForestRegressor(oob_score=True, random_state=42)
 
         # param_grid_rf = {
@@ -648,19 +634,19 @@ class Model:
         )
         grid_rf.fit(X_combined, y_combined)
 
-        y_pred_rf = grid_rf.predict(X_test_for_reg)
+        y_pred_rf = grid_rf.predict(X_test)
         y_pred_train = grid_rf.predict(X_combined)
 
         results_rf = pd.DataFrame({
-            'actual': y_test_for_reg,   
+            'actual': y_test,   
             'pred': y_pred_rf, 
             "week_canton": test["week_canton"].values
         })
 
         results_rf.to_csv(f'../../data/model_results/{momento}/results_{var}_rf_{momento}_{canton}.csv')
 
-        mae_rf = mean_absolute_error(y_test_for_reg, y_pred_rf)
-        rmse_rf = root_mean_squared_error(y_test_for_reg, y_pred_rf)
+        mae_rf = mean_absolute_error(y_test, y_pred_rf)
+        rmse_rf = root_mean_squared_error(y_test, y_pred_rf)
         rmse_rf_train = root_mean_squared_error(y_combined, y_pred_train)
 
         if canton != "full":
@@ -670,7 +656,7 @@ class Model:
             RMSE rf: {round(rmse_rf, 3)}
                 """)
        
-        nrmse_rf = rmse_rf / np.mean(y_test_for_reg)
+        nrmse_rf = rmse_rf / np.mean(y_test)
         print(f"nrmse: {round(nrmse_rf, 2)}")
 
         print(f"""
@@ -680,7 +666,7 @@ class Model:
 
         fig, ax = plt.subplots()
         ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
-        ax.scatter(y_test_for_reg, y_pred_rf)
+        ax.scatter(y_test, y_pred_rf)
         fig.suptitle(f"RF real vs predicted for {var}")
         plt.show()
 
@@ -690,7 +676,7 @@ class Model:
 
         return grid_rf
 
-    def xgb_reg(self, var, momento, canton, X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds):
+    def xgb_reg(self, var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds):
 
         xgb = XGBRegressor(random_state=42)
 
@@ -718,19 +704,19 @@ class Model:
 
         grid_xgb.fit(X_combined, y_combined)
 
-        y_pred_xgb = grid_xgb.predict(X_test_for_reg)
+        y_pred_xgb = grid_xgb.predict(X_test)
         y_pred_train = grid_xgb.predict(X_combined)
 
         results_xgb = pd.DataFrame({
-            'actual': y_test_for_reg,   
+            'actual': y_test,   
             'pred': y_pred_xgb, 
             "week_canton": test["week_canton"].values
         })
 
         results_xgb.to_csv(f'../../data/model_results/{momento}/results_{var}_xgb_{momento}_{canton}.csv')
 
-        mae_xgb = mean_absolute_error(y_test_for_reg, y_pred_xgb)
-        rmse_xgb = root_mean_squared_error(y_test_for_reg, y_pred_xgb)
+        mae_xgb = mean_absolute_error(y_test, y_pred_xgb)
+        rmse_xgb = root_mean_squared_error(y_test, y_pred_xgb)
         rmse_rf_train = root_mean_squared_error(y_combined, y_pred_train)
 
         if canton != "full":
@@ -740,7 +726,7 @@ class Model:
             RMSE xgb: {round(rmse_xgb, 3)}
                 """)
 
-        nrmse_rf = rmse_xgb / np.mean(y_test_for_reg)
+        nrmse_rf = rmse_xgb / np.mean(y_test)
         print(f"nrmse: {round(nrmse_rf, 2)}")
 
         print(f"""
@@ -750,7 +736,7 @@ class Model:
 
         fig, ax = plt.subplots()
         ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
-        ax.scatter(y_test_for_reg, y_pred_xgb)
+        ax.scatter(y_test, y_pred_xgb)
         fig.suptitle(f"XGB real vs predicted for {var}")
         plt.show()
 
@@ -824,27 +810,27 @@ class Model:
 
         plt.show()
 
-    def log_reg(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
+    def log_reg(self, var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds):
         reg = LogisticRegression()
 
-        reg.fit(X_train_scaled, y_train)
+        reg.fit(X_combined_scaled, y_combined)
 
-        y_pred_reg = reg.predict(X_test_for_reg_scaled)
+        y_pred_reg = reg.predict(X_test_scaled)
 
         results_reg = pd.DataFrame({
-            'actual': y_test_for_reg,   
+            'actual': y_test,   
             'pred': y_pred_reg,
             "week_canton": val_test["week_canton"].values # FIX
         })
 
         results_reg.to_csv(f'../../data/model_results/{momento}/results_{var}_reg_{momento}_{canton}.csv')
 
-        print(classification_report(y_test_for_reg, y_pred_reg))
+        print(classification_report(y_test, y_pred_reg))
 
-        label_binarizer = LabelBinarizer().fit(y_train)
-        y_onehot_test = label_binarizer.transform(y_test_for_reg)
+        label_binarizer = LabelBinarizer().fit(y_combined)
+        y_onehot_test = label_binarizer.transform(y_test)
 
-        y_score_reg = reg.predict_proba(X_test_for_reg_scaled)
+        y_score_reg = reg.predict_proba(X_combined_scaled)
 
         known_classes = set(label_binarizer.classes_)
 
@@ -860,7 +846,7 @@ class Model:
                 y_score_reg, label_binarizer, y_onehot_test
             )
 
-        cnf_matrix_reg = confusion_matrix(y_test_for_reg, y_pred_reg)
+        cnf_matrix_reg = confusion_matrix(y_test, y_pred_reg)
         disp = ConfusionMatrixDisplay(confusion_matrix=cnf_matrix_reg, display_labels = ["Alto", "Bajo", "Medio"])
         disp.plot()
         disp.ax_.set_title(f"Logistic regression confusion matrix for {var}")
@@ -869,7 +855,7 @@ class Model:
 
         return reg
 
-    def rf_classi(self, var, momento, canton, X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds):
+    def rf_classi(self, var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds):
         rf = RandomForestClassifier(oob_score=True, random_state=42)
 
         param_grid_rf = {
@@ -889,22 +875,22 @@ class Model:
         grid_rf = GridSearchCV(estimator=rf, param_grid=param_grid_rf, cv = pds, n_jobs=-1, verbose=10)
         grid_rf.fit(X_combined, y_combined)
 
-        y_pred_rf = grid_rf.predict(X_test_for_reg)
+        y_pred_rf = grid_rf.predict(X_combined)
 
         results_rf = pd.DataFrame({
-            'actual': y_test_for_reg,   
+            'actual': y_test,   
             'pred': y_pred_rf,
             "week_canton": test["week_canton"].values
         })
 
         results_rf.to_csv(f'../../data/model_results/{momento}/results_{var}_rf_{momento}_{canton}.csv')
 
-        y_score_rf = grid_rf.predict_proba(X_test_for_reg)
+        y_score_rf = grid_rf.predict_proba(X_test)
 
         label_binarizer = LabelBinarizer().fit(y_combined)
-        y_onehot_test = label_binarizer.transform(y_test_for_reg)
+        y_onehot_test = label_binarizer.transform(y_test)
 
-        print(classification_report(y_test_for_reg, y_pred_rf))
+        print(classification_report(y_test, y_pred_rf))
 
         known_classes = set(label_binarizer.classes_)
 
@@ -920,7 +906,7 @@ class Model:
                 y_score_rf, label_binarizer, y_onehot_test
             )
 
-        cnf_matrix_rf = confusion_matrix(y_test_for_reg, y_pred_rf)
+        cnf_matrix_rf = confusion_matrix(y_test, y_pred_rf)
         disp = ConfusionMatrixDisplay(confusion_matrix=cnf_matrix_rf)
         disp.plot()
         disp.ax_.set_title(f"RF confusion matrix for {var}")
@@ -931,17 +917,17 @@ class Model:
 
         return grid_rf
 
-    def xgb_classi(self, var, momento, canton, X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds):
+    def xgb_classi(self, var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds):
 
         classes_in_train = set(y_combined)
-        mask = y_test_for_reg.isin(classes_in_train)
+        mask = y_test.isin(classes_in_train)
 
-        X_test_for_reg = X_test_for_reg.loc[mask]
-        y_test_for_reg = y_test_for_reg[mask]
+        X_test = X_test.loc[mask]
+        y_test = y_test[mask]
 
         le = LabelEncoder()
         y_combined_encoded = le.fit_transform(y_combined)
-        y_test_encoded = le.transform(y_test_for_reg)
+        y_test_encoded = le.transform(y_test)
 
         xgb = XGBClassifier(random_state=42)
 
@@ -962,19 +948,19 @@ class Model:
         grid_xgb = GridSearchCV(estimator=xgb, param_grid=param_grid_xgb, cv = pds, n_jobs=-1, verbose=0)
         grid_xgb.fit(X_combined, y_combined_encoded)
 
-        y_pred_xgb = grid_xgb.predict(X_test_for_reg)
+        y_pred_xgb = grid_xgb.predict(X_test)
 
-        val_test_filtered = val_test.loc[mask]
+        test_filtered = test.loc[mask]
 
         results_xgb = pd.DataFrame({
             'actual': y_test_encoded,   
             'pred': y_pred_xgb,
-            "week_canton": val_test_filtered["week_canton"].values
+            "week_canton": test_filtered["week_canton"].values
         })
 
         results_xgb.to_csv(f'../../data/model_results/{momento}/results_{var}_xgb_{momento}_{canton}.csv')
 
-        y_score_xgb = grid_xgb.predict_proba(X_test_for_reg)
+        y_score_xgb = grid_xgb.predict_proba(X_test)
 
         n_classes = len(le.classes_)
 
@@ -1017,7 +1003,7 @@ class Model:
 
         return grid_xgb
 
-    def hybrid(self, var, momento, canton, classi_type, reg_type, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
+    def hybrid(self, var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds):
         # FIX
 
         y_train_bin = np.where(y_train > 0, 1, 0)
@@ -1218,70 +1204,70 @@ class Model:
     def model_results(self, var, momento, canton = "full"):
         if var == "cases":
 
-            X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_cases(momento)
+            X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds = self.partition_cases(momento)
 
             print("********** LINEAR REGRESSION **********")
 
-            reg = self.linear_reg(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            reg = self.linear_reg(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             print("********** RF **********")
 
-            grid_rf = self.rf_reg(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            grid_rf = self.rf_reg(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             print("********** XGB **********")
 
-            grid_xgb = self.xgb_reg(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            grid_xgb = self.xgb_reg(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             # coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
 
         elif var == "rr":
-            X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_rr(momento)
+            X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds = self.partition_rr(momento)
 
             print("********** LINEAR REGRESSION **********")
 
-            reg = self.linear_reg(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            reg = self.linear_reg(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             print("********** RF **********")
 
-            grid_rf = self.rf_reg(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            grid_rf = self.rf_reg(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             print("********** XGB **********")
 
-            grid_xgb = self.xgb_reg(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            grid_xgb = self.xgb_reg(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             # coef_reg_sorted = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg)
             
         elif var in ["classi_rr", "clasi_rr"]:
-            X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_classi_rr(momento)
+            X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds = self.partition_classi_rr(momento)
 
             print("********** LOGISTIC REGRESSION **********")
 
-            reg = self.log_reg(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            reg = self.log_reg(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             print("********** RF **********")
 
-            grid_rf = self.rf_classi(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            grid_rf = self.rf_classi(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             print("********** XGB **********")
 
-            grid_xgb = self.xgb_classi(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            grid_xgb = self.xgb_classi(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             # coef_reg_sorted = self.importance_ml(var = var, X_train = X_train_scaled, X_test_for_reg = X_test_for_reg_scaled, y_test_for_reg = y_test_for_reg, model = reg, model_type = "logistic")
 
         elif var in ["classi_no_0", "clasi_no_0"]:
-            X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled = self.partition_classi_rr_no_0(momento) 
+            X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds = self.partition_classi_rr_no_0(momento) 
 
             print("********** LOGISTIC REGRESSION **********")
 
-            reg = self.log_reg(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            reg = self.log_reg(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             print("********** RF **********")
 
-            grid_rf = self.rf_classi(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            grid_rf = self.rf_classi(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             print("********** XGB **********")
 
-            grid_xgb = self.xgb_classi(var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled)
+            grid_xgb = self.xgb_classi(var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds)
 
             # coef_reg_sorted = self.importance_ml(var = var, X_train = X_train_scaled, X_test_for_reg = X_test_for_reg_scaled, y_test_for_reg = y_test_for_reg, model = reg, model_type = "logistic")
             
