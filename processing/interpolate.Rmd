@@ -179,7 +179,7 @@ pob_int <- interpolate(pobs_t, ymd("2019-06-30"), ymd("2026-06-30"))
 ```
 
 ```{r}
-write.csv(pob_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/pob_int_rr.csv")
+write.csv(pob_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/pob_int_rr.csv")
 ```
 
 ```{r}
@@ -191,7 +191,7 @@ pob_pivot <- canton_week(pob_int_0, var_name = "pob")
 ```
 
 ```{r}
-write.csv(pob_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/pob_int.csv")
+write.csv(pob_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/interim/pob_int.csv")
 ```
 
 # NDVI
@@ -337,7 +337,7 @@ baseNDVI_pivot <- canton_week(baseNDVI_eda, "ndvi")
 ```
 
 ```{r}
-write.csv(baseNDVI_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/NDVI_int.csv")
+write.csv(baseNDVI_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/interim/NDVI_int.csv")
 ```
 
 # El Niño
@@ -416,5 +416,5 @@ baseSST_pivot <- canton_week(df = baseSST_int, var_name = "nino34ssta")
 ```
 
 ```{r}
-write.csv(baseSST_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/SST_int.csv")
+write.csv(baseSST_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/interim/SST_int.csv")
 ```
