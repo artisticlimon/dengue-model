@@ -8,13 +8,14 @@ import xgboost as xgb
 from sklearn.preprocessing import OrdinalEncoder
 import numpy as np
 from sklearn.preprocessing import LabelBinarizer, label_binarize
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from xgboost import XGBClassifier
 from sklearn.preprocessing import LabelBinarizer, LabelEncoder
 import joblib
 from xgboost import XGBRegressor
 from sklearn.inspection import permutation_importance
 from sklearn.feature_selection import RFECV
+from skopt import BayesSearchCV
 
 class Model:
     def __init__(self, df):
@@ -129,10 +130,19 @@ class Model:
         y_train = train["casos"]
 
         X_val = val.drop(columns = ["casos", "week_canton"])
-        y_val= val["casos"]
+        y_val= val["casos"] 
 
         X_test= test.drop(columns = ["casos", "week_canton"])
-        y_test = test["casos"]
+        y_test = test["casos"] 
+
+        X_combined = pd.concat([X_train, X_val], axis=0)
+        y_combined = pd.concat([y_train, y_val], axis=0)
+
+        split_indices = np.zeros(len(X_combined))
+        split_indices[:len(X_train)] = -1
+        split_indices[len(X_train):] = 0
+
+        pds = PredefinedSplit(test_fold=split_indices)
 
         scaler = StandardScaler()  
 
@@ -146,7 +156,7 @@ class Model:
 
         X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
 
-        return X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled
+        return X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds
 
     def partition_rr(self, momento):
         df_temp = self.df.copy()
@@ -209,6 +219,15 @@ class Model:
         X_test= test.drop(columns = ["rr", "week_canton"])
         y_test = test["rr"]
 
+        X_combined = pd.concat([X_train, X_val], axis=0)
+        y_combined = pd.concat([y_train, y_val], axis=0)
+
+        split_indices = np.zeros(len(X_combined))
+        split_indices[:len(X_train)] = -1
+        split_indices[len(X_train):] = 0
+
+        pds = PredefinedSplit(test_fold=split_indices)
+
         scaler = StandardScaler()  
 
         X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
@@ -221,7 +240,7 @@ class Model:
 
         X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
 
-        return X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled
+        return X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds
 
     def partition_classi_rr(self, momento):
         df_temp = self.df.copy()
@@ -302,6 +321,15 @@ class Model:
         X_test= test.drop(columns = ["clasi_rr", "week_canton"])
         y_test = test["clasi_rr"]
 
+        X_combined = pd.concat([X_train, X_val], axis=0)
+        y_combined = pd.concat([y_train, y_val], axis=0)
+
+        split_indices = np.zeros(len(X_combined))
+        split_indices[:len(X_train)] = -1
+        split_indices[len(X_train):] = 0
+
+        pds = PredefinedSplit(test_fold=split_indices)
+
         scaler = StandardScaler()  
 
         X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
@@ -314,7 +342,7 @@ class Model:
 
         X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
 
-        return X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled
+        return X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds
 
     def partition_classi_rr_no_0(self, momento):
         df_temp = self.df.copy()
@@ -395,110 +423,14 @@ class Model:
         X_test= test.drop(columns = ["clasi_rr_no_0", "week_canton"])
         y_test = test["clasi_rr_no_0"]
 
-        scaler = StandardScaler()  
+        X_combined = pd.concat([X_train, X_val], axis=0)
+        y_combined = pd.concat([y_train, y_val], axis=0)
 
-        X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
-        X_val_scaled = pd.DataFrame(scaler.transform(X_val), columns=X_val.columns)  
-        X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
+        split_indices = np.zeros(len(X_combined))
+        split_indices[:len(X_train)] = -1
+        split_indices[len(X_train):] = 0
 
-        X_test_for_reg = pd.concat([X_val, X_test], axis=0)
-        y_test_for_reg = pd.concat([y_val, y_test], axis=0)
-        val_test = pd.concat([val, test], axis=0)
-
-        X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
-
-        return X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled
-
-    def partition_zero(self, momento):
-        df_temp = self.df.copy()
-
-        df_temp["zeros"] = np.where(df_temp["casos"] == 0, 0, 1)
-
-        df_temp.drop(columns=['clasi_rr'], inplace=True)
-        df_temp.drop(columns=['rr'], inplace=True)
-        df_temp.drop(columns = ["casos"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0"], inplace = True)
-
-        df_temp = self.drop_lags(i = 1, f = 9, df_temp = df_temp)
-        for i in range(1, 9):
-            df_temp.drop(columns = [f"rr_lag_{i}"], inplace = True)
-
-        if momento == "inmediato":
-            df_temp = self.drop_lags(i = 5, f = 9, df_temp = df_temp)
-            for i in range(5, 9):
-                df_temp.drop(columns = [f"clasi_rr_no_0_lag_{i}"], inplace = True)
-                df_temp["zeros_lag_{i}"] = np.where(df_temp["casos_lag_{i}"] == 0, 0, 1)
-
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_1"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_2"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_3"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_4"])
-
-        elif momento == "mediano":
-            df_temp = self.drop_lags(i = 1, f = 5, df_temp = df_temp)
-            for i in range(1, 5):
-                df_temp.drop(columns = [f"clasi_rr_no_0_lag_{i}"], inplace = True)
-                df_temp["zeros_lag_{i}"] = np.where(df_temp["casos_lag_{i}"] == 0, 0, 1)
-
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_5"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_6"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_7"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_8"])
-
-        elif momento == "todos":
-            for i in range(1, 9):
-                df_temp["zeros_lag_{i}"] = np.where(df_temp["casos_lag_{i}"] == 0, 0, 1)
-
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_1"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_2"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_3"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_4"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_5"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_6"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_7"])
-            df_temp = pd.get_dummies(df_temp, columns = ["zeros_lag_8"])
-        else:
-            print("Error in partition_class: momento is not valid")
-
-        df_temp.drop(columns = ["casos_lag_1"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_1"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_1"], inplace = True)
-        df_temp.drop(columns = ["casos_lag_2"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_2"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_2"], inplace = True)
-        df_temp.drop(columns = ["casos_lag_3"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_3"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_3"], inplace = True)
-        df_temp.drop(columns = ["casos_lag_4"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_4"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_4"], inplace = True)
-        df_temp.drop(columns = ["casos_lag_5"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_5"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_5"], inplace = True)
-        df_temp.drop(columns = ["casos_lag_6"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_6"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_6"], inplace = True)
-        df_temp.drop(columns = ["casos_lag_7"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_7"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_7"], inplace = True)
-        df_temp.drop(columns = ["casos_lag_8"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_8"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_8"], inplace = True)
-
-        df_temp = pd.get_dummies(df_temp, columns = ["urb"])
-
-        train = df_temp[df_temp['week_canton'] < '2024-1-101']
-        val = df_temp[(df_temp['week_canton'] >= '2024-1-101') & (df_temp['week_canton'] < '2025-1-101')]
-        test = df_temp[df_temp['week_canton'] >= '2025-1-101']
-
-        X_train = train.drop(columns = ["zeros", "week_canton"])
-        y_train = train["zeros"]
-
-        X_val = val.drop(columns = ["zeros", "week_canton"])
-        y_val= val["zeros"]
-
-        X_test= test.drop(columns = ["zeros", "week_canton"])
-        y_test = test["zeros"]
+        pds = PredefinedSplit(test_fold=split_indices)
 
         scaler = StandardScaler()  
 
@@ -512,7 +444,7 @@ class Model:
 
         X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
 
-        return X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled
+        return X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds
 
     def serie_temp_canton(self, var, model, momento, canton):
 
@@ -648,12 +580,12 @@ class Model:
         reg = LinearRegression().fit(X_train_scaled, y_train)
 
         y_pred_reg = reg.predict(X_test_for_reg_scaled)
-        y_pred_train = reg.predict(X_train)
+        y_pred_train = reg.predict(X_train_scaled)
 
         results_reg = pd.DataFrame({
             'actual': y_test_for_reg,   
             'pred': y_pred_reg, 
-            "week_canton": val_test["week_canton"].values
+            "week_canton": val_test["week_canton"].values # FIX
         })
 
         results_reg.to_csv(f'../../data/model_results/{momento}/results_{var}_reg_{momento}_{canton}.csv')
@@ -689,8 +621,8 @@ class Model:
 
         return reg
 
-    def rf_reg(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
-        rf = RandomForestRegressor(oob_score=True)
+    def rf_reg(self, var, momento, canton, X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds):
+        rf = RandomForestRegressor(oob_score=True, random_state=42)
 
         # param_grid_rf = {
         #     'max_depth': [1, 2, 3],
@@ -707,23 +639,29 @@ class Model:
             "criterion": ["squared_error", "absolute_error"]
         }
 
-        grid_rf = GridSearchCV(estimator=rf, param_grid=param_grid_rf, cv = 5, n_jobs=-1, verbose=10)
-        grid_rf.fit(X_train, y_train)
+        grid_rf = GridSearchCV(
+            estimator=rf, 
+            param_grid=param_grid_rf, 
+            cv=pds, 
+            scoring='neg_mean_squared_error', 
+            n_jobs=-1
+        )
+        grid_rf.fit(X_combined, y_combined)
 
         y_pred_rf = grid_rf.predict(X_test_for_reg)
-        y_pred_train = grid_rf.predict(X_train)
+        y_pred_train = grid_rf.predict(X_combined)
 
         results_rf = pd.DataFrame({
             'actual': y_test_for_reg,   
             'pred': y_pred_rf, 
-            "week_canton": val_test["week_canton"].values
+            "week_canton": test["week_canton"].values
         })
 
         results_rf.to_csv(f'../../data/model_results/{momento}/results_{var}_rf_{momento}_{canton}.csv')
 
         mae_rf = mean_absolute_error(y_test_for_reg, y_pred_rf)
         rmse_rf = root_mean_squared_error(y_test_for_reg, y_pred_rf)
-        rmse_rf_train = root_mean_squared_error(y_train, y_pred_train)
+        rmse_rf_train = root_mean_squared_error(y_combined, y_pred_train)
 
         if canton != "full":
             self.serie_temp_canton(var, "rf", momento, canton)
@@ -752,9 +690,9 @@ class Model:
 
         return grid_rf
 
-    def xgb_reg(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
+    def xgb_reg(self, var, momento, canton, X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds):
 
-        xgb = XGBRegressor()
+        xgb = XGBRegressor(random_state=42)
 
         # param_grid_xgb = {
         #     'max_depth': [5],
@@ -770,23 +708,30 @@ class Model:
             "criterion": ["friednman_mse", "squared_error"]
         }
 
-        grid_xgb = GridSearchCV(estimator=xgb, param_grid=param_grid_xgb, cv = 5, n_jobs=-1, verbose=0)
-        grid_xgb.fit(X_train, y_train)
+        grid_xgb = GridSearchCV(
+            estimator=xgb, 
+            param_grid=param_grid_xgb, 
+            cv=pds, 
+            scoring='neg_mean_squared_error', 
+            n_jobs=-1
+        )
+
+        grid_xgb.fit(X_combined, y_combined)
 
         y_pred_xgb = grid_xgb.predict(X_test_for_reg)
-        y_pred_train = grid_xgb.predict(X_train)
+        y_pred_train = grid_xgb.predict(X_combined)
 
         results_xgb = pd.DataFrame({
             'actual': y_test_for_reg,   
             'pred': y_pred_xgb, 
-            "week_canton": val_test["week_canton"].values
+            "week_canton": test["week_canton"].values
         })
 
         results_xgb.to_csv(f'../../data/model_results/{momento}/results_{var}_xgb_{momento}_{canton}.csv')
 
         mae_xgb = mean_absolute_error(y_test_for_reg, y_pred_xgb)
         rmse_xgb = root_mean_squared_error(y_test_for_reg, y_pred_xgb)
-        rmse_rf_train = root_mean_squared_error(y_train, y_pred_train)
+        rmse_rf_train = root_mean_squared_error(y_combined, y_pred_train)
 
         if canton != "full":
             self.serie_temp_canton(var, "xgb", momento, canton)
@@ -889,7 +834,7 @@ class Model:
         results_reg = pd.DataFrame({
             'actual': y_test_for_reg,   
             'pred': y_pred_reg,
-            "week_canton": val_test["week_canton"].values
+            "week_canton": val_test["week_canton"].values # FIX
         })
 
         results_reg.to_csv(f'../../data/model_results/{momento}/results_{var}_reg_{momento}_{canton}.csv')
@@ -899,7 +844,7 @@ class Model:
         label_binarizer = LabelBinarizer().fit(y_train)
         y_onehot_test = label_binarizer.transform(y_test_for_reg)
 
-        y_score_reg = reg.predict_proba(X_test_for_reg)
+        y_score_reg = reg.predict_proba(X_test_for_reg_scaled)
 
         known_classes = set(label_binarizer.classes_)
 
@@ -924,8 +869,8 @@ class Model:
 
         return reg
 
-    def rf_classi(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
-        rf = RandomForestClassifier(oob_score=True)
+    def rf_classi(self, var, momento, canton, X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds):
+        rf = RandomForestClassifier(oob_score=True, random_state=42)
 
         param_grid_rf = {
             'max_depth': [5],
@@ -941,22 +886,22 @@ class Model:
         #     "criterion": ["gini", "entropy"]
         # }
 
-        grid_rf = GridSearchCV(estimator=rf, param_grid=param_grid_rf, cv = 5, n_jobs=-1, verbose=10)
-        grid_rf.fit(X_train, y_train)
+        grid_rf = GridSearchCV(estimator=rf, param_grid=param_grid_rf, cv = pds, n_jobs=-1, verbose=10)
+        grid_rf.fit(X_combined, y_combined)
 
         y_pred_rf = grid_rf.predict(X_test_for_reg)
 
         results_rf = pd.DataFrame({
             'actual': y_test_for_reg,   
             'pred': y_pred_rf,
-            "week_canton": val_test["week_canton"].values
+            "week_canton": test["week_canton"].values
         })
 
         results_rf.to_csv(f'../../data/model_results/{momento}/results_{var}_rf_{momento}_{canton}.csv')
 
         y_score_rf = grid_rf.predict_proba(X_test_for_reg)
 
-        label_binarizer = LabelBinarizer().fit(y_train)
+        label_binarizer = LabelBinarizer().fit(y_combined)
         y_onehot_test = label_binarizer.transform(y_test_for_reg)
 
         print(classification_report(y_test_for_reg, y_pred_rf))
@@ -986,19 +931,19 @@ class Model:
 
         return grid_rf
 
-    def xgb_classi(self, var, momento, canton, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
+    def xgb_classi(self, var, momento, canton, X_train, y_train, X_combined, y_combined, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, test, X_test_for_reg_scaled, pds):
 
-        classes_in_train = set(y_train)
+        classes_in_train = set(y_combined)
         mask = y_test_for_reg.isin(classes_in_train)
 
         X_test_for_reg = X_test_for_reg.loc[mask]
         y_test_for_reg = y_test_for_reg[mask]
 
         le = LabelEncoder()
-        y_train_encoded = le.fit_transform(y_train)
+        y_combined_encoded = le.fit_transform(y_combined)
         y_test_encoded = le.transform(y_test_for_reg)
 
-        xgb = XGBClassifier()
+        xgb = XGBClassifier(random_state=42)
 
         param_grid_xgb = {
             'max_depth': [5],
@@ -1014,8 +959,8 @@ class Model:
         #     "reg_lambda": [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
         # }
 
-        grid_xgb = GridSearchCV(estimator=xgb, param_grid=param_grid_xgb, cv = 5, n_jobs=-1, verbose=0)
-        grid_xgb.fit(X_train, y_train_encoded)
+        grid_xgb = GridSearchCV(estimator=xgb, param_grid=param_grid_xgb, cv = pds, n_jobs=-1, verbose=0)
+        grid_xgb.fit(X_combined, y_combined_encoded)
 
         y_pred_xgb = grid_xgb.predict(X_test_for_reg)
 
@@ -1073,7 +1018,8 @@ class Model:
         return grid_xgb
 
     def hybrid(self, var, momento, canton, classi_type, reg_type, X_train, y_train, X_val, y_val, X_test, y_test, X_train_scaled, X_val_scaled, X_test_scaled, X_test_for_reg, y_test_for_reg, val_test, X_test_for_reg_scaled):
-        
+        # FIX
+
         y_train_bin = np.where(y_train > 0, 1, 0)
 
         if classi_type == "reg":
@@ -1146,7 +1092,7 @@ class Model:
 
             reg_model = LinearRegression().fit(X_train_scaled_1, y_train_1)
 
-            y_pred_reg = reg_model.predict(X_test_for_reg_scaled)
+            y_pred_reg = reg_model.predict(X_test_for_reg_scaled[y_pred_classi == 1])
         elif reg_type == "rf":
             X_train_1 = X_train[y_train > 0]
             y_train_1 = y_train[y_train > 0]
@@ -1172,7 +1118,7 @@ class Model:
 
             X_test_for_reg_1 = X_test_for_reg[y_pred_classi == 1]
 
-            y_pred_reg = grid_rf.predict(X_test_for_reg)
+            y_pred_reg = grid_rf.predict(X_test_for_reg_1)
 
             reg_model = grid_rf.best_estimator_
         
@@ -1202,7 +1148,7 @@ class Model:
 
             X_test_for_reg_1 = X_test_for_reg[y_pred_classi == 1]
 
-            y_pred_reg = grid_xgb.predict(X_test_for_reg)
+            y_pred_reg = grid_xgb.predict(X_test_for_reg[y_pred_classi == 1])
 
             reg_model = grid_xgb.best_estimator_
 
@@ -1210,7 +1156,7 @@ class Model:
             print("Invalid regression model")
 
         results = pd.DataFrame({
-            'actual': y_test_for_reg,   
+            'actual': y_test_for_reg[y_pred_classi == 1],   
             'pred': y_pred_reg,
             "week_canton": val_test["week_canton"].values
         })
@@ -1218,14 +1164,14 @@ class Model:
         results.to_csv(f'../../data/model_results/{momento}/results_{var}_hybrid_{classi_type}_{reg_type}_{momento}_{canton}.csv')
         
         if reg_type == "reg":
-            y_pred_train = reg_model.predict(X_train_scaled)
+            y_pred_train = reg_model.predict(X_train_scaled[y_pred_classi == 1])
         else:
-            y_pred_train = reg_model.predict(X_train)
+            y_pred_train = reg_model.predict(X_train[y_pred_classi == 1])
 
-        mae = mean_absolute_error(y_test_for_reg, y_pred_reg)
-        rmse = root_mean_squared_error(y_test_for_reg, y_pred_reg)
+        mae = mean_absolute_error(y_test_for_reg[y_pred_classi == 1], y_pred_reg)
+        rmse = root_mean_squared_error(y_test_for_reg[y_pred_classi == 1], y_pred_reg)
         mse = rmse ** 2
-        rmse_train = root_mean_squared_error(y_train, y_pred_train)
+        rmse_train = root_mean_squared_error(y_train[y_pred_classi == 1], y_pred_train)
 
         if canton != "full":
             self.serie_temp_canton(var, f"hybrid_{classi_type}_{reg_type}", momento, canton)
@@ -1234,7 +1180,7 @@ class Model:
             RMSE: {round(rmse, 3)}
                 """)
        
-        nrmse = rmse / np.mean(y_test_for_reg)
+        nrmse = rmse / np.mean(y_test_for_reg[y_pred_classi == 1])
         print(f"nrmse: {round(nrmse, 2)}")
         print(f"""
             MSE test: {round(mse, 3)}
