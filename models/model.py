@@ -77,65 +77,46 @@ class Model:
     def partition_cases(self, momento):
         df_temp = self.df.copy()
 
-        df_temp.drop(columns=['clasi_rr'], inplace=True)
-        df_temp.drop(columns = ["rr"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0"], inplace = True)
+        df_temp = df_temp.drop(columns=["clasi_rr", "rr", "clasi_rr_no_0"], errors="ignore")
 
         if momento == "inmediato":
-            df_temp = self.drop_lags(i = 5, f = 9, df_temp = df_temp)
-            for i in range(5, 9):
-                df_temp.drop(columns = [f"casos_lag_{i}"], inplace = True)
-
+            df_temp = self.drop_lags(i=5, f=9, df_temp=df_temp)
+            df_temp = df_temp.drop(columns=[f"casos_lag_{i}" for i in range(5, 9)], errors="ignore")
         elif momento == "mediano":
-            df_temp = self.drop_lags(i = 1, f = 5, df_temp = df_temp)
-            for i in range(1, 5):
-                df_temp.drop(columns = [f"casos_lag_{i}"], inplace = True)
-        elif momento == "todos":
-            pass
-        else:
-            print("Error in partition_class: momento is not valid")
+            df_temp = self.drop_lags(i=1, f=5, df_temp=df_temp)
+            df_temp = df_temp.drop(columns=[f"casos_lag_{i}" for i in range(1, 5)], errors="ignore")
+        elif momento != "todos":
+            raise ValueError("momento is not valid")
 
-        df_temp.drop(columns = ["rr_lag_1"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_1"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_1"], inplace = True)
-        df_temp.drop(columns = ["rr_lag_2"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_2"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_2"], inplace = True)
-        df_temp.drop(columns = ["rr_lag_3"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_3"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_3"], inplace = True)
-        df_temp.drop(columns = ["rr_lag_4"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_4"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_4"], inplace = True)
-        df_temp.drop(columns = ["rr_lag_5"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_5"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_5"], inplace = True)
-        df_temp.drop(columns = ["rr_lag_6"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_6"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_6"], inplace = True)
-        df_temp.drop(columns = ["rr_lag_7"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_7"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_7"], inplace = True)
-        df_temp.drop(columns = ["rr_lag_8"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_lag_8"], inplace = True)
-        df_temp.drop(columns = ["clasi_rr_no_0_lag_8"], inplace = True)
+        cols_to_drop = [
+            "rr_lag_1", "clasi_rr_lag_1", "clasi_rr_no_0_lag_1",
+            "rr_lag_2", "clasi_rr_lag_2", "clasi_rr_no_0_lag_2",
+            "rr_lag_3", "clasi_rr_lag_3", "clasi_rr_no_0_lag_3",
+            "rr_lag_4", "clasi_rr_lag_4", "clasi_rr_no_0_lag_4",
+            "rr_lag_5", "clasi_rr_lag_5", "clasi_rr_no_0_lag_5",
+            "rr_lag_6", "clasi_rr_lag_6", "clasi_rr_no_0_lag_6",
+            "rr_lag_7", "clasi_rr_lag_7", "clasi_rr_no_0_lag_7",
+            "rr_lag_8", "clasi_rr_lag_8", "clasi_rr_no_0_lag_8",
+        ]
+        df_temp = df_temp.drop(columns=cols_to_drop, errors="ignore")
 
-        df_temp = pd.get_dummies(df_temp, columns = ["urb"])
+        df_temp = pd.get_dummies(df_temp, columns=["urb"], drop_first=False)
+        df_temp = df_temp.reset_index(drop=True)
 
-        train = df_temp[df_temp['week_canton'] < '2024-1-101']
-        val = df_temp[(df_temp['week_canton'] >= '2024-1-101') & (df_temp['week_canton'] < '2025-1-101')]
-        test = df_temp[df_temp['week_canton'] >= '2025-1-101']
+        train = df_temp[df_temp["week_canton"] < "2024-1-101"].reset_index(drop=True)
+        val = df_temp[(df_temp["week_canton"] >= "2024-1-101") & (df_temp["week_canton"] < "2025-1-101")].reset_index(drop=True)
+        test = df_temp[df_temp["week_canton"] >= "2025-1-101"].reset_index(drop=True)
 
-        epsilon = 0.46 # This epsilon was found through trial and error, looking at histograms for each value
+        epsilon = 0.46
 
-        X_train = train.drop(columns = ["casos", "week_canton"])
-        y_train = np.log(train["casos"] + epsilon)
+        X_train = train.drop(columns=["casos", "week_canton"]).reset_index(drop=True)
+        y_train = np.log(train["casos"] + epsilon).reset_index(drop=True)
 
-        X_val = val.drop(columns = ["casos", "week_canton"])
-        y_val= np.log(val["casos"] + epsilon) 
+        X_val = val.drop(columns=["casos", "week_canton"]).reset_index(drop=True)
+        y_val = np.log(val["casos"] + epsilon).reset_index(drop=True)
 
-        X_test= test.drop(columns = ["casos", "week_canton"])
-        y_test = np.log(test["casos"] + epsilon)
+        X_test = test.drop(columns=["casos", "week_canton"]).reset_index(drop=True)
+        y_test = np.log(test["casos"] + epsilon).reset_index(drop=True)
 
         X_combined = pd.concat([X_train, X_val], axis=0)
         y_combined = pd.concat([y_train, y_val], axis=0)
@@ -227,7 +208,7 @@ class Model:
 
         scaler = StandardScaler()  
 
-        X_combined_scaled = pd.DataFrame(scaler.fit_transform(X_combined), columns=X_train.columns)
+        X_combined_scaled = pd.DataFrame(scaler.fit_transform(X_combined), columns=X_combined.columns)
         X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
 
         return X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds, epsilon
@@ -417,15 +398,8 @@ class Model:
 
         scaler = StandardScaler()  
 
-        X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
-        X_val_scaled = pd.DataFrame(scaler.transform(X_val), columns=X_val.columns)  
+        X_combined_scaled = pd.DataFrame(scaler.fit_transform(X_combined), columns=X_train.columns)
         X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
-
-        X_test_for_reg = pd.concat([X_val, X_test], axis=0)
-        y_test_for_reg = pd.concat([y_val, y_test], axis=0)
-        val_test = pd.concat([val, test], axis=0)
-
-        X_test_for_reg_scaled = pd.DataFrame(scaler.transform(X_test_for_reg), columns=X_test_for_reg.columns)
 
         return X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds
 
@@ -562,8 +536,8 @@ class Model:
 
         reg = LinearRegression().fit(X_combined_scaled, y_combined)
 
-        y_pred_reg = np.exp(X_test_scaled) - epsilon
-        y_pred_train = np.exp(reg.predict(X_combined_scaled))
+        y_pred_reg = np.exp(reg.predict(X_test_scaled)) - epsilon
+        y_pred_train = np.exp(reg.predict(X_combined_scaled)) - epsilon
 
         y_test = np.exp(y_test) - epsilon
         y_combined = np.exp(y_combined) - epsilon
@@ -723,7 +697,7 @@ class Model:
 
         mae_xgb = mean_absolute_error(y_test, y_pred_xgb)
         rmse_xgb = root_mean_squared_error(y_test, y_pred_xgb)
-        rmse_rf_train = root_mean_squared_error(y_combined, y_pred_train)
+        rmse_xgb_train = root_mean_squared_error(y_combined, y_pred_train)
 
         if canton != "full":
             self.serie_temp_canton(var, "xgb", momento, canton)
@@ -736,8 +710,8 @@ class Model:
         print(f"nrmse: {round(nrmse_rf, 2)}")
 
         print(f"""
-            RMSE train rf: {round(rmse_rf_train, 3)}
-            MSE train xgb: {round(rmse_rf_train ** 2, 3)}
+            RMSE train xgb: {round(rmse_xgb_train, 3)}
+            MSE train xgb: {round(rmse_xgb_train ** 2, 3)}
                 """)
 
         fig, ax = plt.subplots()
@@ -755,6 +729,10 @@ class Model:
     def roc_auc_metrics_log(self, var, class_of_interest, y_score_reg, label_binarizer, y_onehot_test):
         class_id = np.flatnonzero(label_binarizer.classes_ == class_of_interest)[0]
 
+        if len(np.unique(y_onehot_test[:, class_id])) < 2:
+            print(f"Skipping roc_auc_metrics_log for '{class_of_interest}': class not present in test set")
+            return
+
         display = RocCurveDisplay.from_predictions(
             y_onehot_test[:, class_id],
             y_score_reg[:, class_id],
@@ -766,11 +744,15 @@ class Model:
         _ = display.ax_.set(
             xlabel="False Positive Rate",
             ylabel="True Positive Rate",
-            title=f"Logistic: One-vs-Rest ROC curves for {var}:\n{class_of_interest} vs el resto)",
+            title=f"Logistic: One-vs-Rest ROC curves for {var}:\n{class_of_interest} vs el resto",
         )
 
     def roc_auc_metrics_rf(self, var, class_of_interest, y_score_rf, label_binarizer, y_onehot_test):
         class_id = np.flatnonzero(label_binarizer.classes_ == class_of_interest)[0]
+
+        if len(np.unique(y_onehot_test[:, class_id])) < 2:
+            print(f"Skipping roc_auc_metrics_rf for '{class_of_interest}': class not present in test set")
+            return
 
         display = RocCurveDisplay.from_predictions(
             y_onehot_test[:, class_id],
@@ -789,7 +771,7 @@ class Model:
     def roc_auc_metrics_xgb(self, var, class_of_interest, y_score_xgb, y_true, class_index):
 
         if len(np.unique(y_true)) < 2:
-            print(f"Skipping ROC for {class_of_interest}: only one class present")
+            print(f"Skipping ROC for {class_of_interest}: class not present in test set")
             return
 
         y_true_binary = (y_true == class_index).astype(int)
@@ -817,6 +799,7 @@ class Model:
         plt.show()
 
     def log_reg(self, var, momento, canton, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds):
+        
         reg = LogisticRegression()
 
         reg.fit(X_combined_scaled, y_combined)
@@ -826,7 +809,7 @@ class Model:
         results_reg = pd.DataFrame({
             'actual': y_test,   
             'pred': y_pred_reg,
-            "week_canton": val_test["week_canton"].values # FIX
+            "week_canton": test["week_canton"].values # FIX
         })
 
         results_reg.to_csv(f'../../data/model_results/{momento}/results_{var}_reg_{momento}_{canton}.csv')
@@ -836,7 +819,7 @@ class Model:
         label_binarizer = LabelBinarizer().fit(y_combined)
         y_onehot_test = label_binarizer.transform(y_test)
 
-        y_score_reg = reg.predict_proba(X_combined_scaled)
+        y_score_reg = reg.predict_proba(X_test_scaled)
 
         known_classes = set(label_binarizer.classes_)
 
@@ -881,7 +864,7 @@ class Model:
         grid_rf = GridSearchCV(estimator=rf, param_grid=param_grid_rf, cv = pds, n_jobs=-1, verbose=10)
         grid_rf.fit(X_combined, y_combined)
 
-        y_pred_rf = grid_rf.predict(X_combined)
+        y_pred_rf = grid_rf.predict(X_test)
 
         results_rf = pd.DataFrame({
             'actual': y_test,   
@@ -1011,197 +994,150 @@ class Model:
 
     def hybrid(self, var, momento, canton, classi_type, reg_type, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds, epsilon):
 
-        y_combined_actual = np.exp(y_combined) - epsilon
+        X_combined = X_combined.reset_index(drop=True)
+        X_test = X_test.reset_index(drop=True)
+        y_combined = pd.Series(y_combined).reset_index(drop=True)
+        y_test = pd.Series(y_test).reset_index(drop=True)
+        test = test.reset_index(drop=True)
 
-        y_train_bin = np.where(y_combined_actual > 0, 1, 0)
+        y_combined_actual = np.exp(y_combined) - epsilon
+        y_train_bin = pd.Series((y_combined_actual > 0).astype(int)).reset_index(drop=True)
 
         if classi_type == "reg":
-            reg = LogisticRegression()
-
-            reg.fit(X_combined_scaled, y_train_bin)
-
-            y_pred_classi = reg.predict(X_test_scaled)
+            clf = LogisticRegression(max_iter=1000)
+            clf.fit(X_combined_scaled, y_train_bin)
+            y_pred_classi = clf.predict(X_test_scaled)
 
         elif classi_type == "rf":
-            rf = RandomForestClassifier(oob_score=True)
-
-            param_grid_rf = {
-                'max_depth': [5],
-                'min_samples_split': [10],
-                'ccp_alpha': [0], 
-                "criterion": ["gini"]
+            clf = RandomForestClassifier(oob_score=True, random_state=42)
+            param_grid = {
+                "max_depth": [5],
+                "min_samples_split": [10],
+                "ccp_alpha": [0],
+                "criterion": ["gini"],
             }
-
-            # param_grid_rf = {
-            #     'max_depth': [5, 6, 7, 8],
-            #     'min_samples_split': [10, 100, 500],
-            #     'ccp_alpha': [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10], 
-            #     "criterion": ["gini", "entropy"]
-            # }
-
-            grid_rf = GridSearchCV(estimator=rf, param_grid=param_grid_rf, cv = 5, n_jobs=-1, verbose=10)
-            grid_rf.fit(X_combined, y_train_bin)
-
-            y_pred_classi = grid_rf.predict(X_test_scaled)
+            grid = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, verbose=10)
+            grid.fit(X_combined, y_train_bin)
+            y_pred_classi = grid.predict(X_test)
 
         elif classi_type == "xgb":
-            classes_in_train = set(y_combined)
-            mask = y_test.isin(classes_in_train)
-
-            X_test = X_test.loc[mask]
-            y_test = y_test[mask]
-
-            le = LabelEncoder()
-            y_train_encoded = le.fit_transform(y_train_bin)
-            y_test_encoded = le.transform(y_test)
-
-            xgb = XGBClassifier()
-
-            param_grid_xgb = {
-                'max_depth': [5],
-                'learning_rate': [0.3],
-                'n_estimators': [50],
-                "reg_lambda": [0]
+            clf = XGBClassifier(random_state=42, eval_metric="logloss")
+            param_grid = {
+                "max_depth": [5],
+                "learning_rate": [0.3],
+                "n_estimators": [50],
+                "reg_lambda": [0],
             }
+            grid = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, verbose=0)
+            grid.fit(X_combined, y_train_bin)
+            y_pred_classi = grid.predict(X_test)
 
-            # param_grid_xgb = {
-            #     'max_depth': [5, 6, 7, 8],
-            #     'learning_rate': [0.3, 0.1, 0.05],
-            #     'n_estimators': [50, 100, 150], 
-            #     "reg_lambda": [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
-            # }
+        else:
+            raise ValueError("Invalid classification model")
 
-            grid_xgb = GridSearchCV(estimator=xgb, param_grid=param_grid_xgb, cv = 5, n_jobs=-1, verbose=0)
-            grid_xgb.fit(X_combined, y_train_encoded)
+        print("positive rows:", (y_combined_actual > 0).sum())
 
-            y_pred_classi = grid_xgb.predict(X_test)
+        mask_pos_train = y_combined_actual > 0
+        X_combined_1 = X_combined.loc[mask_pos_train].reset_index(drop=True)
+        y_combined_1 = y_combined.loc[mask_pos_train].reset_index(drop=True)
+        if mask_pos_train.sum() == 0:
+            raise ValueError("No positive cases in train available for regression after filtering.")
+        
+        filtered_test_fold = pds.test_fold[mask_pos_train.values]
+        pds_1 = PredefinedSplit(filtered_test_fold)
 
-        else: 
-            print("Invalid classification model")
+        mask_pos_test = pd.Series(y_pred_classi == 1)
+        X_test_1 = X_test.loc[mask_pos_test].reset_index(drop=True)
+        test_1 = test.loc[mask_pos_test].reset_index(drop=True)
+        if mask_pos_test.sum() == 0:
+            raise ValueError("No positive cases in test available for regression after filtering.")
+
+        if len(X_test_1) == 0:
+            raise ValueError("No positive cases predicted in test set.")
 
         if reg_type == "reg":
-            X_train_scaled_1 = X_combined_scaled[y_combined_actual > 0]
-            y_train_1 = y_combined[y_combined_actual > 0]
+            X_train_scaled_1 = X_combined_scaled[mask_pos_train.values]
+            y_train_1 = y_combined.loc[mask_pos_train].reset_index(drop=True)
 
             reg_model = LinearRegression().fit(X_train_scaled_1, y_train_1)
-
-            y_pred_reg = reg_model.predict(X_test_scaled[y_pred_classi == 1])
+            y_pred_reg = reg_model.predict(X_test_scaled[mask_pos_test.values])
 
         elif reg_type == "rf":
-            X_combined_1 = X_combined[y_combined_actual > 0]
-            y_combined_1 = y_combined[y_combined_actual > 0]
 
-            rf = RandomForestRegressor(oob_score=True)
-
-            param_grid_rf = {
-                'max_depth': [5],
-                'min_samples_split': [10],
-                'ccp_alpha': [0], 
-                "criterion": ["squared_error"]
+            reg_model = RandomForestRegressor(random_state=42)
+            param_grid = {
+                "max_depth": [5],
+                "min_samples_split": [10],
+                "ccp_alpha": [0],
+                "criterion": ["squared_error"],
             }
+            grid = GridSearchCV(
+                reg_model,
+                param_grid,
+                cv=pds_1,
+                n_jobs=-1,
+                verbose=10,
+                scoring="neg_mean_squared_error",
+            )
+            grid.fit(X_combined_1, y_combined_1)
+            reg_model = grid.best_estimator_
+            y_pred_reg = grid.predict(X_test_1)
 
-            # param_grid_rf = {
-            #     'max_depth': [5, 6, 7, 8],
-            #     'min_samples_split': [10, 100, 500],
-            #     'ccp_alpha': [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10], 
-            #     "criterion": ["squared_error", "absolute_error"]
-            # }
-
-            grid_rf = GridSearchCV(estimator=rf, param_grid=param_grid_rf, cv = 5, n_jobs=-1, verbose=10)
-            grid_rf.fit(X_combined_1, y_combined_1)
-
-            X_test_1 = X_test[y_pred_classi == 1]
-
-            y_pred_reg = grid_rf.predict(X_test_1)
-
-            reg_model = grid_rf.best_estimator_
-        
         elif reg_type == "xgb":
-            X_combined_1 = X_combined[y_combined_actual > 0]
-            y_combined_1 = y_combined[y_combined_actual > 0]
-
-            xgb = XGBRegressor()
-
-            param_grid_xgb = {
-                'max_depth': [5],
-                'learning_rate': [0.1],
-                'n_estimator': [50], 
-                "criterion": ["friednman_mse"]
+            reg_model = XGBRegressor(random_state=42, eval_metric="rmse")
+            param_grid = {
+                "max_depth": [5],
+                "learning_rate": [0.1],
+                "n_estimators": [50],
+                "reg_lambda": [0],
             }
+            grid = GridSearchCV(
+                reg_model,
+                param_grid,
+                cv=pds_1,
+                n_jobs=-1,
+                verbose=0,
+                scoring="neg_mean_squared_error",
+            )
+            grid.fit(X_combined_1, y_combined_1)
+            reg_model = grid.best_estimator_
+            y_pred_reg = grid.predict(X_test_1)
 
-            # param_grid_xgb = {
-            #     'max_depth': [5, 6, 7, 8],
-            #     'learning_rate': [0.1, 0.3, 0.05],
-            #     'n_estimator': [50, 100, 150], 
-            #     "criterion": ["friednman_mse", "squared_error"]
-            # }
+        else:
+            raise ValueError("Invalid regression model")
 
-            grid_xgb = GridSearchCV(estimator=xgb, param_grid=param_grid_xgb, cv = 5, n_jobs=-1, verbose=0)
-            
-            grid_xgb.fit(X_combined_1, y_combined_1)
-
-            X_test_1 = X_test[y_pred_classi == 1]
-
-            y_pred_reg = grid_xgb.predict(X_test[y_pred_classi == 1])
-
-            reg_model = grid_xgb.best_estimator_
-
-        else: 
-            print("Invalid regression model")
-
-        y_test = np.exp(y_test) - epsilon
+        y_test_actual = np.exp(y_test) - epsilon
         y_pred_reg = np.exp(y_pred_reg) - epsilon
+        y_pred_train = np.exp(reg_model.predict(X_combined_1)) - epsilon
 
         results = pd.DataFrame({
-            'actual': y_test[y_pred_classi == 1],   
-            'pred': y_pred_reg,
-            "week_canton": test["week_canton"].values
+            "actual": y_test_actual.loc[mask_pos_test].reset_index(drop=True),
+            "pred": y_pred_reg,
+            "week_canton": test_1["week_canton"].values,
         })
 
-        results.to_csv(f'../../data/model_results/{momento}/results_{var}_hybrid_{classi_type}_{reg_type}_{momento}_{canton}.csv')
-        
-        if reg_type == "reg":
-            y_pred_train = np.exp(reg_model.predict(X_combined_scaled[y_pred_classi == 1])) - epsilon
-        else:
-            y_pred_train = np.exp(reg_model.predict(X_combined[y_pred_classi == 1])) - epsilon
-        
+        results.to_csv(
+            f"../../data/model_results/{momento}/results_{var}_hybrid_{classi_type}_{reg_type}_{momento}_{canton}.csv",
+            index=False
+        )
 
-        mae = mean_absolute_error(y_test[y_pred_classi == 1], y_pred_reg)
-        rmse = root_mean_squared_error(y_test[y_pred_classi == 1], y_pred_reg)
+        mae = mean_absolute_error(results["actual"], results["pred"])
+        rmse = root_mean_squared_error(results["actual"], results["pred"])
         mse = rmse ** 2
-        rmse_train = root_mean_squared_error(y_combined_actual[y_pred_classi == 1], y_pred_train)
+        rmse_train = root_mean_squared_error(np.exp(y_combined_1) - epsilon, y_pred_train)
 
         if canton != "full":
             self.serie_temp_canton(var, f"hybrid_{classi_type}_{reg_type}", momento, canton)
         else:
-            print(f"""MAE: {round(mae, 3)}
-            RMSE: {round(rmse, 3)}
-                """)
-       
-        nrmse = rmse / np.mean(y_test[y_pred_classi == 1])
+            print(f"MAE: {round(mae, 3)}")
+            print(f"RMSE: {round(rmse, 3)}")
+
+        nrmse = rmse / np.mean(results["actual"])
         print(f"nrmse: {round(nrmse, 2)}")
-        print(f"""
-            MSE test: {round(mse, 3)}
-            RMSE test: {round(rmse, 3)}
-            RMSE train: {round(rmse_train, 3)}
-            MSE train: {round(rmse_train ** 2, 3)}
-                """)
-
-        # fig, ax = plt.subplots()
-        # ax.plot([min(y_test_for_reg), max(y_test_for_reg)], [min(y_test_for_reg), max(y_test_for_reg)], color='red', linestyle='--')
-        # ax.scatter(y_test_for_reg, y_pred_reg)
-        # fig.suptitle(f"hybrid_{classi_type}_{reg_type} real vs predicted for {var}")
-        # plt.show()
-
-        # if reg_type == "reg":
-        #     imp = self.importance_classic(var = var, X_train = X_train, X_train_scaled = X_train_scaled, model = reg_model)
-        # else: 
-        #     imp = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = reg_model, model_type = f"hybrid_{classi_type}_{reg_type}")
-
-        # if reg_type == "reg":
-        #     self.rfecv_selection(var = var, model_type = f"hybrid_{classi_type}_{reg_type}", model = reg_model, X_train = X_train_scaled_1, y_train = y_train_1, X_test_for_reg = X_test_for_reg_scaled, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
-        # else:
-        #     self.rfecv_selection(var = var, model_type = f"hybrid_{classi_type}_{reg_type}", model = reg_model, X_train = X_train_1, y_train = y_train_1, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, canton = canton, momento = momento)
+        print(f"MSE test: {round(mse, 3)}")
+        print(f"RMSE test: {round(rmse, 3)}")
+        print(f"RMSE train: {round(rmse_train, 3)}")
+        print(f"MSE train: {round(rmse_train ** 2, 3)}")
 
         return reg_model
 
