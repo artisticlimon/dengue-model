@@ -1,6 +1,6 @@
 import pandas as pd
 from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, RocCurveDisplay, r2_score, mean_absolute_error, root_mean_squared_error
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, RocCurveDisplay, r2_score, mean_absolute_error, root_mean_squared_error, roc_auc_score
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler, LabelBinarizer
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -1001,13 +1001,19 @@ class Model:
         test = test.reset_index(drop=True)
 
         y_combined_actual = np.exp(y_combined) - epsilon
+        y_test_actual = np.exp(y_test) - epsilon 
         y_train_bin = pd.Series((y_combined_actual > 0).astype(int)).reset_index(drop=True)
+        y_test_bin = pd.Series((y_test_actual > 0).astype(int)).reset_index(drop=True)
+        if y_test_bin.nunique() < 2:
+            print(f"WARNING: Test set only contains one label: {y_test_bin.unique()[0]}")
 
         if classi_type == "reg":
             clf = LogisticRegression(max_iter=1000)
             clf.fit(X_combined_scaled, y_train_bin)
-            y_pred_classi = clf.predict(X_test_scaled)
-
+            y_pred_classi = clf.predict(X_test_scaled) 
+            print(classification_report(y_test_bin, y_pred_classi))
+            RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test_scaled)[:, 1], plot_chance_level= True)
+            
         elif classi_type == "rf":
             clf = RandomForestClassifier(oob_score=True, random_state=42)
             param_grid = {
@@ -1019,6 +1025,8 @@ class Model:
             grid = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, verbose=10)
             grid.fit(X_combined, y_train_bin)
             y_pred_classi = grid.predict(X_test)
+            print(classification_report(y_test_bin, y_pred_classi))
+            RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
 
         elif classi_type == "xgb":
             clf = XGBClassifier(random_state=42, eval_metric="logloss")
@@ -1031,11 +1039,11 @@ class Model:
             grid = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, verbose=0)
             grid.fit(X_combined, y_train_bin)
             y_pred_classi = grid.predict(X_test)
+            print(classification_report(y_test_bin, y_pred_classi))
+            RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
 
         else:
             raise ValueError("Invalid classification model")
-
-        print("positive rows:", (y_combined_actual > 0).sum())
 
         mask_pos_train = y_combined_actual > 0
         X_combined_1 = X_combined.loc[mask_pos_train].reset_index(drop=True)
