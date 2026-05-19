@@ -1,3 +1,5 @@
+This file generates two csv documents for Google Trends: one with keywords and the other with groups of keywords. The documents contain week-canton pairs as row indexes, necessary for data integration.
+
 ```{r}
 library(dplyr)
 library(lubridate)
@@ -5,7 +7,10 @@ library(tidyr)
 library(readxl)
 ```
 ```{r}
-trends_raw <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_normalized_daily.csv)")
+trends_raw <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_normalized_daily_corrected.csv)")
+
+trends_raw$keyword <- gsub(" ", "_", trends_raw$keyword)
+trends_raw$group <- gsub(" ", "_", trends_raw$group)
 ```
 
 ```{r}
@@ -43,8 +48,9 @@ trends_group <- trends_full |>
 
 
 ```{r}
+# Create year-week pairs to have weekly data
 weeks_date <- seq(ymd("2020-01-01"), ymd("2025-12-31"), by = "week")
-  
+
 trends_group_weeks <- trends_group |> 
   filter(date %in% weeks_date) |> 
   mutate(year = isoyear(date)) |> 
@@ -56,22 +62,23 @@ trends_group_weeks <- trends_group |>
 
 trends_group_weeks <- trends_group_weeks |>
   group_by(week, province, group) |>
-  summarise(value = max(value, na.rm = TRUE), .groups = "drop")
+  summarise(value = max(value, na.rm = TRUE), .groups = "drop") # There are many words in each group, so we choose the word with the most interest
 ```
 
 ```{r}
-# write.csv(trends_group_weeks, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\raw\trends_group_eda.csv)")
+# write.csv(trends_group_weeks, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\eda\trends_group_eda.csv)")
 ```
 
 
 ```{r}
+# Add canton codes instead of canton names
 codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
 
 codes <- codes |> 
   select(ID) |> 
   filter(ID >= 101)
-```
-```{r}
+
+# Substitute canton code with province code because of spatial granularity
 mapping_cantons <- codes |> 
   mutate(province = case_when(
     startsWith(as.character(ID), "1") ~ 1,
@@ -88,10 +95,11 @@ trends_group_canton <- trends_group_weeks |>
   left_join(mapping_cantons %>% select(province, ID), 
             by = "province", 
     relationship = "many-to-many") |> 
-  select(province, group, week, ID, everything())
+  select(province, group, week, ID, everything()) # There are multiple entries for group-province combinations, so the relationship is many-to-many, and set province, group, week, ID as first columns
 ```
 
-```{r}
+```{r} 
+# Build week_canton and set it as the row index
 trends_group_pairs <- trends_group_canton |>
   mutate(week_canton = paste(week, ID, sep = "-")) |> 
   select(-c(ID, week, province))
@@ -111,7 +119,8 @@ weeks_date <- seq(ymd("2020-01-01"), ymd("2025-12-31"), by = "week")
 trends_key_weeks <- trends_full |> 
   select(-c(group)) |> 
   filter(date %in% weeks_date) 
-  
+
+# Create year-week pairs to have weekly data
 trends_key_weeks <- trends_key_weeks |> 
 mutate(year = isoyear(date)) |> 
 filter(year %in% c(2020, 2021, 2022, 2023, 2024, 2025)) |> 
@@ -131,13 +140,13 @@ select(-c(date, year, week1))
 ```
 
 ```{r}
+# Add canton codes instead of canton names. Sa
 codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
 
 codes <- codes |> 
   select(ID) |> 
   filter(ID >= 101)
-```
-```{r}
+
 mapping_cantons <- codes |> 
   mutate(province = case_when(
     startsWith(as.character(ID), "1") ~ 1,
@@ -154,18 +163,12 @@ trends_key_canton <- trends_key_weeks |>
   left_join(mapping_cantons %>% select(province, ID), 
             by = "province", 
             relationship = "many-to-many") |> 
-  select(province, keyword, week, ID, everything())
-```
-
-```{r}
-unique(trends_key_canton$province)
-```
-```{r}
-which(is.na(trends_raw$value))
+  select(province, keyword, week, ID, everything()) # There are multiple entries for keyword-province combinations, so the relationship is many-to-many, and set province, group, week, ID as first columns
 ```
 
 
 ```{r}
+# Build week_canton and set it as the row index
 trends_key_pairs <- trends_key_canton |>
   mutate(week_canton = paste(week, ID, sep = "-")) |> 
   select(-c(ID, week, province))
@@ -176,6 +179,7 @@ trends_key_wide <- pivot_wider(trends_key_pairs, names_from = keyword, values_fr
 ```{r}
 write.csv(trends_key_wide, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\clean\trends_keywords.csv)")
 ```
+
 
 
 
