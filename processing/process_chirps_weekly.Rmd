@@ -10,6 +10,29 @@ library(gstat)
 ```
 
 ```{r}
+para_eda <- function(df, var) {
+#  Function that saves a csv file to be used in the EDA report. 
+
+# Parameters
+#  ----
+#  df: dataframe
+#    Data that contains the week and canton codes as columns
+
+#  var: string
+#    Variable that will fill the cells in the dataframe. For example, if the variable is "mean," the resulting dataframe from this function will contain the data for the mean.
+
+#  Returns
+#  ----
+#  Nothing, just saves df_new (the generated dataframe with weeks as rows and canton codes as columns) in a csv file for eda purposes
+  
+  df_new <- df |> 
+    select(c(week, ID, var)) |>
+    pivot_wider(names_from = ID, values_from = var, id_cols = week)
+  write.csv(df_new, file = paste0("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/", var, "_eda.csv"))
+}
+```
+
+```{r}
 setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps")
 
 precip <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps/chirps_precip.csv")
@@ -20,7 +43,7 @@ precip$time = ymd(precip$time)
 ```
 
 ```{r} 
-# Aggregat weekly 
+# Aggregate weekly 
 precip_weekly_site <- precip |> 
   group_by(canton, year = isoyear(time), week1 = isoweek(time)) |>
   summarise(precip_total = sum(precip),
@@ -52,7 +75,7 @@ codes[32, "canton"] = "SARCHI"
 
 
 ```{r}
-# Add canton code to dataset
+# Standardize canton name in dataset so it is ready to be merged
 precip_weekly_site <- precip_weekly_site |> 
    mutate(canton = toupper(canton)) |> 
    mutate(canton = chartr("áéíóúñÁÉÍÓÚ", "aeiounAEIOU", canton)) 
@@ -69,7 +92,10 @@ precip_lat <- precip[!duplicated(precip$lat),] |>
 precip_lon_lat <- left_join(precip_lon, precip_lat, by = "canton") |> 
    mutate(canton = toupper(canton)) |> 
    mutate(canton = chartr("áéíóúñÁÉÍÓÚ", "aeiounAEIOU", canton)) 
+```
 
+```{r}
+# Merge to obtain a database that contains the canton code as ID, the latitude and the longitude, plus the values for the variables
 precip_weekly <- left_join(precip_weekly_site, codes, by = "canton") |> 
   left_join(precip_lon_lat, by = "canton") |> 
   select(-c(year, week1, canton))
@@ -174,7 +200,6 @@ for (i in 1:312) {
 }
 ```
 
-
 ```{r}
 # Impute median precipitation
 for (i in 1:312) {
@@ -203,15 +228,6 @@ for (i in 1:312) {
 ```{r}
 precip_weekly = precip_weekly |> 
   select(precip_total, precip_max, precip_min, precip_mean, precip_median, week, ID)
-```
-
-```{r}
-para_eda <- function(df, var) {
-  df_new <- df |> 
-    select(c(week, ID, var)) |>
-    pivot_wider(names_from = ID, values_from = var, id_cols = week)
-  write.csv(df_new, file = paste0("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/", var, "_eda.csv"))
-}
 ```
 
 ```{r}
