@@ -22,8 +22,8 @@ class Model:
         self.df = df.copy()
         self.df.drop(columns = ["tmax_mean"], inplace = True)
         self.df.drop(columns = ["tmin_mean"], inplace = True)
-        self.df.drop(columns = ["temp_prom"], inplace = True)
-        self.df.drop(columns = ["precip_total"], inplace = True)
+        # self.df.drop(columns = ["temp_prom"], inplace = True)
+        # self.df.drop(columns = ["precip_total"], inplace = True)
         self.df.drop(columns = ["precip_max"], inplace = True)
         self.df.drop(columns = ["precip_min"], inplace = True)
         self.df.drop(columns = ["precip_median"], inplace = True)
@@ -188,13 +188,22 @@ class Model:
 
         epsilon = 0.2 # This epsilon was found through trial and error, looking at histograms for each value
 
-        X_train = train.drop(columns = ["rr", "week_canton"])
+        X_train = train.drop(columns = ["rr", "week_canton"]).reset_index(drop=True)
+        # X_train = train[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
+        # X_train["precip_total"] = np.log(X_train["precip_total"] + 0.01)
+        # X_train["precip_total_lag_2"] = np.log(X_train["precip_total_lag_2"] + 0.01)
         y_train = np.log(train["rr"] + epsilon)
 
-        X_val = val.drop(columns = ["rr", "week_canton"])
-        y_val= np.log(val["rr"] + epsilon)
+        X_val= val.drop(columns = ["rr", "week_canton"]).reset_index(drop=True)
+        # X_val = val[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
+        # X_val["precip_total"] = np.log(X_val["precip_total"] + 0.01)
+        # X_val["precip_total_lag_2"] = np.log(X_val["precip_total_lag_2"] + 0.01)
+        y_val= np.log(val["rr"]  + epsilon)
 
-        X_test= test.drop(columns = ["rr", "week_canton"])
+        X_test = test.drop(columns = ["rr", "week_canton"]).reset_index(drop=True)
+        # X_test = test[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
+        # X_test["precip_total"] = np.log(X_test["precip_total"] + 0.01)
+        # X_test["precip_total_lag_2"] = np.log(X_test["precip_total_lag_2"] + 0.01)
         y_test = np.log(test["rr"] + epsilon)
 
         X_combined = pd.concat([X_train, X_val], axis=0)
@@ -608,11 +617,11 @@ class Model:
         )
         grid_rf.fit(X_combined, y_combined)
 
-        y_test = np.exp(y_test) - epsilon
-        y_combined = np.exp(y_combined) - epsilon
+        #y_test = np.exp(y_test) - epsilon
+        #y_combined = np.exp(y_combined) - epsilon
 
-        y_pred_rf = np.exp(grid_rf.predict(X_test)) - epsilon
-        y_pred_train = np.exp(grid_rf.predict(X_combined)) - epsilon
+        y_pred_rf = grid_rf.predict(X_test) # CHANGE THIS
+        y_pred_train = grid_rf.predict(X_combined)  # CHANGE THIS
 
         results_rf = pd.DataFrame({
             'actual': y_test,   
@@ -1007,14 +1016,14 @@ class Model:
         if y_test_bin.nunique() < 2:
             print(f"WARNING: Test set only contains one label: {y_test_bin.unique()[0]}")
 
-        if classi_type == "reg":
+        if classi_type == "reg" and y_test_bin.nunique() >= 2:
             clf = LogisticRegression(max_iter=1000)
             clf.fit(X_combined_scaled, y_train_bin)
             y_pred_classi = clf.predict(X_test_scaled) 
             print(classification_report(y_test_bin, y_pred_classi))
-            RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test_scaled)[:, 1], plot_chance_level= True)
+            # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test_scaled)[:, 1], plot_chance_level= True)
             
-        elif classi_type == "rf":
+        elif classi_type == "rf" and y_test_bin.nunique() >= 2:
             clf = RandomForestClassifier(oob_score=True, random_state=42)
             param_grid = {
                 "max_depth": [5],
@@ -1026,9 +1035,9 @@ class Model:
             grid.fit(X_combined, y_train_bin)
             y_pred_classi = grid.predict(X_test)
             print(classification_report(y_test_bin, y_pred_classi))
-            RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
+            # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
 
-        elif classi_type == "xgb":
+        elif classi_type == "xgb" and y_test_bin.nunique() >= 2:
             clf = XGBClassifier(random_state=42, eval_metric="logloss")
             param_grid = {
                 "max_depth": [5],
@@ -1040,35 +1049,39 @@ class Model:
             grid.fit(X_combined, y_train_bin)
             y_pred_classi = grid.predict(X_test)
             print(classification_report(y_test_bin, y_pred_classi))
-            RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
-
+            # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
+        elif y_test_bin.nunique() < 2:
+            print("Only one class present in test set for classification. Skipping classification step.")
+            y_pred_classi = np.repeat(y_test_bin.unique(), len(y_test_bin))  
         else:
-            raise ValueError("Invalid classification model")
+            print("Invalid classification model")
 
         mask_pos_train = y_combined_actual > 0
         X_combined_1 = X_combined.loc[mask_pos_train].reset_index(drop=True)
         y_combined_1 = y_combined.loc[mask_pos_train].reset_index(drop=True)
         if mask_pos_train.sum() == 0:
-            raise ValueError("No positive cases in train available for regression after filtering.")
+            print("No positive cases in train available for regression after filtering.")
         
         filtered_test_fold = pds.test_fold[mask_pos_train.values]
         pds_1 = PredefinedSplit(filtered_test_fold)
 
         mask_pos_test = pd.Series(y_pred_classi == 1)
-        X_test_1 = X_test.loc[mask_pos_test].reset_index(drop=True)
-        test_1 = test.loc[mask_pos_test].reset_index(drop=True)
-        if mask_pos_test.sum() == 0:
-            raise ValueError("No positive cases in test available for regression after filtering.")
+        # X_test_1 = X_test.loc[mask_pos_test].reset_index(drop=True)
+        # test_1 = test.loc[mask_pos_test].reset_index(drop=True)
+        # if mask_pos_test.sum() == 0:
+        #     print("No positive cases in test available for regression after filtering.")
 
-        if len(X_test_1) == 0:
-            raise ValueError("No positive cases predicted in test set.")
+        # if len(X_test_1) == 0:
+        #     print("No positive cases predicted in test set.")
 
         if reg_type == "reg":
-            X_train_scaled_1 = X_combined_scaled[mask_pos_train.values]
-            y_train_1 = y_combined.loc[mask_pos_train].reset_index(drop=True)
+            # X_train_scaled_1 = X_combined_scaled[mask_pos_train.values]
+            # y_train_1 = y_combined.loc[mask_pos_train].reset_index(drop=True)
 
-            reg_model = LinearRegression().fit(X_train_scaled_1, y_train_1)
-            y_pred_reg = reg_model.predict(X_test_scaled[mask_pos_test.values])
+            X_combined_scaled_1 = X_combined_scaled.loc[mask_pos_train].reset_index(drop=True)
+            reg_model = LinearRegression().fit(X_combined_scaled_1, y_combined_1)
+            y_pred_reg = reg_model.predict(X_test_scaled)
+            y_pred_train = np.exp(reg_model.predict(X_combined_scaled_1)) - epsilon
 
         elif reg_type == "rf":
 
@@ -1089,7 +1102,8 @@ class Model:
             )
             grid.fit(X_combined_1, y_combined_1)
             reg_model = grid.best_estimator_
-            y_pred_reg = grid.predict(X_test_1)
+            y_pred_reg = grid.predict(X_test)
+            y_pred_train = np.exp(reg_model.predict(X_combined_1)) - epsilon
 
         elif reg_type == "xgb":
             reg_model = XGBRegressor(random_state=42, eval_metric="rmse")
@@ -1109,19 +1123,22 @@ class Model:
             )
             grid.fit(X_combined_1, y_combined_1)
             reg_model = grid.best_estimator_
-            y_pred_reg = grid.predict(X_test_1)
+            y_pred_reg = grid.predict(X_test)
+            y_pred_train = np.exp(reg_model.predict(X_combined_1)) - epsilon
 
         else:
-            raise ValueError("Invalid regression model")
+            print("Invalid regression model")
 
+        print(y_pred_reg.shape)
+        print(X_test.shape)
         y_test_actual = np.exp(y_test) - epsilon
         y_pred_reg = np.exp(y_pred_reg) - epsilon
-        y_pred_train = np.exp(reg_model.predict(X_combined_1)) - epsilon
+        y_pred_reg = np.where(y_pred_classi == 0, 0, y_pred_reg)
 
         results = pd.DataFrame({
-            "actual": y_test_actual.loc[mask_pos_test].reset_index(drop=True),
+            "actual": y_test_actual,
             "pred": y_pred_reg,
-            "week_canton": test_1["week_canton"].values,
+            "week_canton": test["week_canton"].values,
         })
 
         results.to_csv(
