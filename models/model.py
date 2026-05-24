@@ -8,7 +8,7 @@ import xgboost as xgb
 from sklearn.preprocessing import OrdinalEncoder
 import numpy as np
 from sklearn.preprocessing import LabelBinarizer, label_binarize
-from sklearn.model_selection import GridSearchCV, PredefinedSplit
+from sklearn.model_selection import GridSearchCV, PredefinedSplit, TunedThresholdClassifierCV
 from xgboost import XGBClassifier
 from sklearn.preprocessing import LabelBinarizer, LabelEncoder
 import joblib
@@ -192,18 +192,21 @@ class Model:
         # X_train = train[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
         # X_train["precip_total"] = np.log(X_train["precip_total"] + 0.01)
         # X_train["precip_total_lag_2"] = np.log(X_train["precip_total_lag_2"] + 0.01)
+        # y_train = train["rr"]
         y_train = np.log(train["rr"] + epsilon)
 
         X_val= val.drop(columns = ["rr", "week_canton"]).reset_index(drop=True)
         # X_val = val[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
         # X_val["precip_total"] = np.log(X_val["precip_total"] + 0.01)
         # X_val["precip_total_lag_2"] = np.log(X_val["precip_total_lag_2"] + 0.01)
+        # y_val= val["rr"]
         y_val= np.log(val["rr"]  + epsilon)
 
         X_test = test.drop(columns = ["rr", "week_canton"]).reset_index(drop=True)
         # X_test = test[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
         # X_test["precip_total"] = np.log(X_test["precip_total"] + 0.01)
         # X_test["precip_total_lag_2"] = np.log(X_test["precip_total_lag_2"] + 0.01)
+        # y_test= test["rr"]
         y_test = np.log(test["rr"] + epsilon)
 
         X_combined = pd.concat([X_train, X_val], axis=0)
@@ -617,11 +620,15 @@ class Model:
         )
         grid_rf.fit(X_combined, y_combined)
 
-        #y_test = np.exp(y_test) - epsilon
-        #y_combined = np.exp(y_combined) - epsilon
+        
+        y_test = np.exp(y_test) - epsilon
+        y_combined = np.exp(y_combined) - epsilon
 
-        y_pred_rf = grid_rf.predict(X_test) # CHANGE THIS
-        y_pred_train = grid_rf.predict(X_combined)  # CHANGE THIS
+        y_pred_rf = grid_rf.predict(X_test)
+        y_pred_train = grid_rf.predict(X_combined)
+
+        y_pred_rf = np.exp(grid_rf.predict(X_test)) - epsilon 
+        y_pred_train = np.exp(grid_rf.predict(X_combined)) - epsilon
 
         results_rf = pd.DataFrame({
             'actual': y_test,   
@@ -692,6 +699,9 @@ class Model:
 
         y_test = np.exp(y_test) - epsilon
         y_combined = np.exp(y_combined) - epsilon
+
+        y_pred_xgb = grid_xgb.predict(X_test)
+        y_pred_train = grid_xgb.predict(X_combined)
 
         y_pred_xgb = np.exp(grid_xgb.predict(X_test)) - epsilon
         y_pred_train = np.exp(grid_xgb.predict(X_combined)) - epsilon
@@ -1011,27 +1021,29 @@ class Model:
 
         y_combined_actual = np.exp(y_combined) - epsilon
         y_test_actual = np.exp(y_test) - epsilon 
-        y_train_bin = pd.Series((y_combined_actual > 0).astype(int)).reset_index(drop=True)
-        y_test_bin = pd.Series((y_test_actual > 0).astype(int)).reset_index(drop=True)
+        y_train_bin = pd.Series((y_combined_actual > 0).astype(int)).reset_index(drop=True) 
+        y_test_bin = pd.Series((y_test_actual > 0).astype(int)).reset_index(drop=True) 
         if y_test_bin.nunique() < 2:
             print(f"WARNING: Test set only contains one label: {y_test_bin.unique()[0]}")
 
         if classi_type == "reg" and y_test_bin.nunique() >= 2:
             clf = LogisticRegression(max_iter=1000)
-            clf.fit(X_combined_scaled, y_train_bin)
-            y_pred_classi = clf.predict(X_test_scaled) 
+            clf.tuned = TunedThresholdClassifierCV(estimator = clf, scoring = "roc_auc", cv = pds)
+            clf.tuned.fit(X_combined_scaled, y_train_bin)
+            y_pred_classi = clf.tuned.predict(X_test_scaled) 
             print(classification_report(y_test_bin, y_pred_classi))
             # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test_scaled)[:, 1], plot_chance_level= True)
             
         elif classi_type == "rf" and y_test_bin.nunique() >= 2:
             clf = RandomForestClassifier(oob_score=True, random_state=42)
+            clf.tuned = TunedThresholdClassifierCV(estimator = clf, cv = 5)
             param_grid = {
-                "max_depth": [5],
-                "min_samples_split": [10],
-                "ccp_alpha": [0],
-                "criterion": ["gini"],
-            }
-            grid = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, verbose=10)
+                "estimator__max_depth": [5],
+                "estimator__min_samples_split": [10],
+                "estimator__ccp_alpha": [0],
+                "estimator__criterion": ["gini"],
+            } 
+            grid = GridSearchCV(clf.tuned, param_grid, cv=pds, n_jobs=-1, verbose=10)
             grid.fit(X_combined, y_train_bin)
             y_pred_classi = grid.predict(X_test)
             print(classification_report(y_test_bin, y_pred_classi))
@@ -1039,13 +1051,14 @@ class Model:
 
         elif classi_type == "xgb" and y_test_bin.nunique() >= 2:
             clf = XGBClassifier(random_state=42, eval_metric="logloss")
+            clf.tuned = TunedThresholdClassifierCV(estimator = clf, scoring = "roc_auc", cv = 5)
             param_grid = {
-                "max_depth": [5],
-                "learning_rate": [0.3],
-                "n_estimators": [50],
-                "reg_lambda": [0],
+                "estimator__max_depth": [5],
+                "estimator__learning_rate": [0.3],
+                "estimator__n_estimators": [50],
+                "estimator__reg_lambda": [0],
             }
-            grid = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, verbose=0)
+            grid = GridSearchCV(clf.tuned, param_grid, cv=5, n_jobs=-1, verbose=0)
             grid.fit(X_combined, y_train_bin)
             y_pred_classi = grid.predict(X_test)
             print(classification_report(y_test_bin, y_pred_classi))
@@ -1056,7 +1069,7 @@ class Model:
         else:
             print("Invalid classification model")
 
-        mask_pos_train = y_combined_actual > 0
+        mask_pos_train = y_combined > 0 # CHANGE TO y_combined_actual
         X_combined_1 = X_combined.loc[mask_pos_train].reset_index(drop=True)
         y_combined_1 = y_combined.loc[mask_pos_train].reset_index(drop=True)
         if mask_pos_train.sum() == 0:
@@ -1081,6 +1094,7 @@ class Model:
             X_combined_scaled_1 = X_combined_scaled.loc[mask_pos_train].reset_index(drop=True)
             reg_model = LinearRegression().fit(X_combined_scaled_1, y_combined_1)
             y_pred_reg = reg_model.predict(X_test_scaled)
+            y_pred_train = reg_model.predict(X_combined_scaled_1)
             y_pred_train = np.exp(reg_model.predict(X_combined_scaled_1)) - epsilon
 
         elif reg_type == "rf":
@@ -1103,6 +1117,7 @@ class Model:
             grid.fit(X_combined_1, y_combined_1)
             reg_model = grid.best_estimator_
             y_pred_reg = grid.predict(X_test)
+            y_pred_train = reg_model.predict(X_combined_1)
             y_pred_train = np.exp(reg_model.predict(X_combined_1)) - epsilon
 
         elif reg_type == "xgb":
@@ -1124,6 +1139,7 @@ class Model:
             grid.fit(X_combined_1, y_combined_1)
             reg_model = grid.best_estimator_
             y_pred_reg = grid.predict(X_test)
+            y_pred_train = reg_model.predict(X_combined_1)
             y_pred_train = np.exp(reg_model.predict(X_combined_1)) - epsilon
 
         else:
