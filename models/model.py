@@ -16,14 +16,15 @@ from xgboost import XGBRegressor
 from sklearn.inspection import permutation_importance
 from sklearn.feature_selection import RFECV
 from skopt import BayesSearchCV
+from tsbootstrap import CircularBlockBootstrap
 
 class Model:
     def __init__(self, df):
         self.df = df.copy()
         self.df.drop(columns = ["tmax_mean"], inplace = True)
         self.df.drop(columns = ["tmin_mean"], inplace = True)
-        # self.df.drop(columns = ["temp_prom"], inplace = True)
-        # self.df.drop(columns = ["precip_total"], inplace = True)
+        self.df.drop(columns = ["temp_prom"], inplace = True)
+        self.df.drop(columns = ["precip_total"], inplace = True)
         self.df.drop(columns = ["precip_max"], inplace = True)
         self.df.drop(columns = ["precip_min"], inplace = True)
         self.df.drop(columns = ["precip_median"], inplace = True)
@@ -182,6 +183,27 @@ class Model:
 
         df_temp = pd.get_dummies(df_temp, columns = ["urb"])
 
+        # df_temp["precip_total_lag_1"] = np.log(df_temp["precip_total_lag_1"] + 0.01)
+        # df_temp["precip_total_lag_2"] = np.log(df_temp["precip_total_lag_2"] + 0.01)
+        # df_temp["precip_total_lag_3"] = np.log(df_temp["precip_total_lag_3"] + 0.01)
+        # df_temp["precip_total_lag_4"] = np.log(df_temp["precip_total_lag_4"] + 0.01)
+        # df_temp["precip_min_lag_1"] = np.log(df_temp["precip_min_lag_1"] + 0.01)
+        # df_temp["precip_min_lag_2"] = np.log(df_temp["precip_min_lag_2"] + 0.01)
+        # df_temp["precip_min_lag_3"] = np.log(df_temp["precip_min_lag_3"] + 0.01)
+        # df_temp["precip_min_lag_4"] = np.log(df_temp["precip_min_lag_4"] + 0.01)
+        # df_temp["precip_max_lag_1"] = np.log(df_temp["precip_max_lag_1"] + 0.01)
+        # df_temp["precip_max_lag_2"] = np.log(df_temp["precip_max_lag_2"] + 0.01)
+        # df_temp["precip_max_lag_3"] = np.log(df_temp["precip_max_lag_3"] + 0.01)
+        # df_temp["precip_max_lag_4"] = np.log(df_temp["precip_max_lag_4"] + 0.01)
+        # df_temp["precip_median_lag_1"] = np.log(df_temp["precip_median_lag_1"] + 0.01)
+        # df_temp["precip_median_lag_2"] = np.log(df_temp["precip_median_lag_2"] + 0.01)
+        # df_temp["precip_median_lag_3"] = np.log(df_temp["precip_median_lag_3"] + 0.01)
+        # df_temp["precip_median_lag_4"] = np.log(df_temp["precip_median_lag_4"] + 0.01)
+        # df_temp["precip_mean_lag_1"] = np.log(df_temp["precip_mean_lag_1"] + 0.01)
+        # df_temp["precip_mean_lag_2"] = np.log(df_temp["precip_mean_lag_2"] + 0.01)
+        # df_temp["precip_mean_lag_3"] = np.log(df_temp["precip_mean_lag_3"] + 0.01)
+        # df_temp["precip_mean_lag_4"] = np.log(df_temp["precip_mean_lag_4"] + 0.01)
+
         train = df_temp[df_temp['week_canton'] < '2024-1-101']
         val = df_temp[(df_temp['week_canton'] >= '2024-1-101') & (df_temp['week_canton'] < '2025-1-101')]
         test = df_temp[df_temp['week_canton'] >= '2025-1-101']
@@ -191,21 +213,18 @@ class Model:
         X_train = train.drop(columns = ["rr", "week_canton"]).reset_index(drop=True)
         # X_train = train[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
         # X_train["precip_total"] = np.log(X_train["precip_total"] + 0.01)
-        # X_train["precip_total_lag_2"] = np.log(X_train["precip_total_lag_2"] + 0.01)
         # y_train = train["rr"]
         y_train = np.log(train["rr"] + epsilon)
 
         X_val= val.drop(columns = ["rr", "week_canton"]).reset_index(drop=True)
         # X_val = val[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
         # X_val["precip_total"] = np.log(X_val["precip_total"] + 0.01)
-        # X_val["precip_total_lag_2"] = np.log(X_val["precip_total_lag_2"] + 0.01)
         # y_val= val["rr"]
         y_val= np.log(val["rr"]  + epsilon)
 
         X_test = test.drop(columns = ["rr", "week_canton"]).reset_index(drop=True)
         # X_test = test[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
         # X_test["precip_total"] = np.log(X_test["precip_total"] + 0.01)
-        # X_test["precip_total_lag_2"] = np.log(X_test["precip_total_lag_2"] + 0.01)
         # y_test= test["rr"]
         y_test = np.log(test["rr"] + epsilon)
 
@@ -619,35 +638,34 @@ class Model:
             n_jobs=-1
         )
         grid_rf.fit(X_combined, y_combined)
-
         
         y_test = np.exp(y_test) - epsilon
         y_combined = np.exp(y_combined) - epsilon
 
-        y_pred_rf = grid_rf.predict(X_test)
-        y_pred_train = grid_rf.predict(X_combined)
+        # y_pred_rf = grid_rf.predict(X_test)
+        # y_pred_train = grid_rf.predict(X_combined)
 
         y_pred_rf = np.exp(grid_rf.predict(X_test)) - epsilon 
         y_pred_train = np.exp(grid_rf.predict(X_combined)) - epsilon
 
         results_rf = pd.DataFrame({
-            'actual': y_test,   
-            'pred': y_pred_rf, 
-            "week_canton": test["week_canton"].values
+             'actual': y_test,   
+             'pred': y_pred_rf, 
+             "week_canton": test["week_canton"].values
         })
 
-        results_rf.to_csv(f'../../data/model_results/{momento}/results_{var}_rf_{momento}_{canton}.csv')
+        # results_rf.to_csv(f'../../data/model_results/{momento}/results_{var}_rf_{momento}_{canton}.csv')
 
         mae_rf = mean_absolute_error(y_test, y_pred_rf)
         rmse_rf = root_mean_squared_error(y_test, y_pred_rf)
         rmse_rf_train = root_mean_squared_error(y_combined, y_pred_train)
 
         if canton != "full":
-            self.serie_temp_canton(var, "rf", momento, canton)
-        else:
-            print(f"""MAE rf: {round(mae_rf, 3)}
-            RMSE rf: {round(rmse_rf, 3)}
-                """)
+             self.calculate_confint(var, momento, canton, "rf", X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, epsilon, grid_rf)
+        # else:
+        #     print(f"""MAE rf: {round(mae_rf, 3)}
+        #     RMSE rf: {round(rmse_rf, 3)}
+        #         """)
        
         nrmse_rf = rmse_rf / np.mean(y_test)
         print(f"nrmse: {round(nrmse_rf, 2)}")
@@ -657,11 +675,11 @@ class Model:
             MSE train rf: {round(rmse_rf_train ** 2, 3)}
                 """)
 
-        fig, ax = plt.subplots()
-        ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
-        ax.scatter(y_test, y_pred_rf)
-        fig.suptitle(f"RF real vs predicted for {var}")
-        plt.show()
+        # fig, ax = plt.subplots()
+        # ax.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
+        # ax.scatter(y_test, y_pred_rf)
+        # fig.suptitle(f"RF real vs predicted for {var}")
+        # plt.show()
 
         # imp_rf = self.importance_ml(var = var, X_train = X_train, X_test_for_reg = X_test_for_reg, y_test_for_reg = y_test_for_reg, model = grid_rf, model_type = "rf")
 
@@ -1069,9 +1087,9 @@ class Model:
         else:
             print("Invalid classification model")
 
-        mask_pos_train = y_combined > 0 # CHANGE TO y_combined_actual
+        mask_pos_train = y_combined_actual > 0 
         X_combined_1 = X_combined.loc[mask_pos_train].reset_index(drop=True)
-        y_combined_1 = y_combined.loc[mask_pos_train].reset_index(drop=True)
+        y_combined_1 = y_combined_actual.loc[mask_pos_train].reset_index(drop=True)
         if mask_pos_train.sum() == 0:
             print("No positive cases in train available for regression after filtering.")
         
@@ -1095,30 +1113,30 @@ class Model:
             reg_model = LinearRegression().fit(X_combined_scaled_1, y_combined_1)
             y_pred_reg = reg_model.predict(X_test_scaled)
             y_pred_train = reg_model.predict(X_combined_scaled_1)
-            y_pred_train = np.exp(reg_model.predict(X_combined_scaled_1)) - epsilon
 
         elif reg_type == "rf":
 
-            reg_model = RandomForestRegressor(random_state=42)
-            param_grid = {
-                "max_depth": [5],
-                "min_samples_split": [10],
-                "ccp_alpha": [0],
-                "criterion": ["squared_error"],
+            reg_model = RandomForestRegressor(oob_score=True, random_state=42)
+
+            param_grid= {
+                'max_depth': [5, 6, 7, 8],
+                'min_samples_split': [10, 100, 500],
+                'ccp_alpha': [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10], 
+                "criterion": ["squared_error", "absolute_error"]
             }
+
             grid = GridSearchCV(
-                reg_model,
-                param_grid,
-                cv=pds_1,
-                n_jobs=-1,
-                verbose=10,
-                scoring="neg_mean_squared_error",
+                estimator=reg_model, 
+                param_grid=param_grid, 
+                cv=pds, 
+                scoring='neg_mean_squared_error', 
+                n_jobs=-1
             )
-            grid.fit(X_combined_1, y_combined_1)
+            
+            grid.fit(X_combined, y_combined)
             reg_model = grid.best_estimator_
             y_pred_reg = grid.predict(X_test)
             y_pred_train = reg_model.predict(X_combined_1)
-            y_pred_train = np.exp(reg_model.predict(X_combined_1)) - epsilon
 
         elif reg_type == "xgb":
             reg_model = XGBRegressor(random_state=42, eval_metric="rmse")
@@ -1140,7 +1158,6 @@ class Model:
             reg_model = grid.best_estimator_
             y_pred_reg = grid.predict(X_test)
             y_pred_train = reg_model.predict(X_combined_1)
-            y_pred_train = np.exp(reg_model.predict(X_combined_1)) - epsilon
 
         else:
             print("Invalid regression model")
@@ -1148,7 +1165,6 @@ class Model:
         print(y_pred_reg.shape)
         print(X_test.shape)
         y_test_actual = np.exp(y_test) - epsilon
-        y_pred_reg = np.exp(y_pred_reg) - epsilon
         y_pred_reg = np.where(y_pred_classi == 0, 0, y_pred_reg)
 
         results = pd.DataFrame({
@@ -1189,6 +1205,66 @@ class Model:
                 tick.tick1line.set_visible(False)
                 tick.tick2line.set_visible(False)
                 tick.gridline.set_visible(False) 
+
+    def calculate_confint(self, var, momento, canton, reg_type, X_combined, y_combined, X_test, y_test, X_combined_scaled,X_test_scaled, epsilon, grid):
+
+        best_params = grid.best_params_
+
+        mbb = CircularBlockBootstrap(
+            n_bootstraps = 10, 
+            block_length = 52,
+            rng = 42
+        )
+
+        models = []
+
+        if reg_type == "reg":
+            X_arr = X_combined_scaled.values if hasattr(X_combined, 'values') else X_combined_scaled
+            y_arr = y_combined.values if hasattr(y_combined, 'values') else y_combined
+        else:
+            X_arr = X_combined.values if hasattr(X_combined, 'values') else X_combined
+            y_arr = y_combined.values if hasattr(y_combined, 'values') else y_combined
+
+        bs_result = list(mbb.bootstrap(X_arr, return_indices=True))
+
+        for boot_data in bs_result:
+
+            X_boot_data, indices = boot_data
+            
+            X_boot = X_boot_data  
+            y_boot = y_arr[indices]  
+
+            rf = RandomForestRegressor(**best_params, random_state = 42)
+
+            rf.fit(X_boot, y_boot)
+
+            models.append(rf)
+
+        if reg_type == "reg":
+            predictions = np.array([model.predict(X_test_scaled) for model in models])
+        else:
+            predictions = np.array([model.predict(X_test) for model in models])
+
+        predictions = np.exp(predictions) - epsilon
+
+        y_pred_point = np.mean(predictions, axis=0)
+
+        lower_bound = np.percentile(predictions, 2.5, axis=0)
+        upper_bound = np.percentile(predictions, 97.5, axis=0)
+
+        fig, ax = plt.subplots()
+
+        y_test_actual = np.exp(y_test) - epsilon
+
+        ax.plot(range(len(y_test)), y_test_actual, label='Reales', marker='o')
+        ax.plot(range(len(y_pred_point)), y_pred_point, label='Predichas', marker='o')
+        ax.set_ylabel(f"{var}")
+        ax.set_xlabel("Momento")
+        ax.set_title(f"{var} real vs predicha para {canton} en {momento}")
+
+        ax.fill_between(range(len(y_pred_point)), lower_bound, upper_bound, alpha = 0.2)
+
+        plt.show()
 
     def model_results(self, var, momento, canton = "full"):
         if var == "cases":
