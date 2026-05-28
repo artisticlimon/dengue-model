@@ -16,7 +16,9 @@ from xgboost import XGBRegressor
 from sklearn.inspection import permutation_importance
 from sklearn.feature_selection import RFECV
 from skopt import BayesSearchCV
-from tsbootstrap import CircularBlockBootstrap
+# from tsbootstrap import CircularBlockBootstrap
+from mapie.regression import CrossConformalRegressor
+
 
 class Model:
     def __init__(self, df):
@@ -214,19 +216,19 @@ class Model:
         # X_train = train[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
         # X_train["precip_total"] = np.log(X_train["precip_total"] + 0.01)
         # y_train = train["rr"]
-        y_train = np.log(train["rr"] + epsilon)
+        y_train = np.log(train["rr"] + epsilon).reset_index(drop=True)
 
         X_val= val.drop(columns = ["rr", "week_canton"]).reset_index(drop=True)
         # X_val = val[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
         # X_val["precip_total"] = np.log(X_val["precip_total"] + 0.01)
         # y_val= val["rr"]
-        y_val= np.log(val["rr"]  + epsilon)
+        y_val= np.log(val["rr"]  + epsilon).reset_index(drop=True)
 
         X_test = test.drop(columns = ["rr", "week_canton"]).reset_index(drop=True)
         # X_test = test[["rr_lag_1", "precip_total", "precip_total_lag_2", "temp_prom", "temp_prom_lag_3", "nino34ssta", "nino34ssta_lag_4"]]
         # X_test["precip_total"] = np.log(X_test["precip_total"] + 0.01)
         # y_test= test["rr"]
-        y_test = np.log(test["rr"] + epsilon)
+        y_test = np.log(test["rr"] + epsilon).reset_index(drop=True)
 
         X_combined = pd.concat([X_train, X_val], axis=0)
         y_combined = pd.concat([y_train, y_val], axis=0)
@@ -434,9 +436,9 @@ class Model:
 
         return X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, test, pds
 
-    def serie_temp_canton(self, var, model, momento, canton):
+    def serie_temp_canton(self, var, model_type, momento, canton, lower_bound, upper_bound,):
 
-        results = pd.read_csv(f'../../data/model_results/{momento}/results_{var}_{model}_{momento}_{canton}.csv')
+        results = pd.read_csv(f'../../data/model_results/{momento}/results_{var}_{model_type}_{momento}_{canton}.csv')
 
         rmse = root_mean_squared_error(results["actual"], results["pred"])
         mse = rmse ** 2
@@ -445,6 +447,7 @@ class Model:
         fig, ax = plt.subplots()
         ax.plot(results['week_canton'], results["actual"], label='Reales', marker='o')
         ax.plot(results['week_canton'], results["pred"], label='Predichos', marker='o')
+        ax.fill_between(x = results['week_canton'], y1 = lower_bound, y2 = upper_bound, alpha = 0.2)
         self.ticks_years_top(ax, 20)
         ax.set_xlabel('Week')
         ax.set_ylabel(f'{var}')
@@ -452,7 +455,7 @@ class Model:
         ax.text(0.9, 0.75, f'MSE: {mse:.2f}', transform=ax.transAxes, ha='center', fontsize=12)
         ax.text(0.9, 0.68, f'RMSE: {rmse:.2f}', transform=ax.transAxes, ha='center', fontsize=12)
         ax.text(0.9, 0.55, f'MAE: {mae:.2f}', transform=ax.transAxes, ha='center', fontsize=12)
-        ax.set_title(f"{model} for {canton}")
+        ax.set_title(f"{model_type} for {canton}")
         plt.show()
     
     def importance_classic(self, var, X_train, X_train_scaled, model):
@@ -638,15 +641,29 @@ class Model:
             n_jobs=-1
         )
         grid_rf.fit(X_combined, y_combined)
-        
-        y_test = np.exp(y_test) - epsilon
-        y_combined = np.exp(y_combined) - epsilon
 
         # y_pred_rf = grid_rf.predict(X_test)
         # y_pred_train = grid_rf.predict(X_combined)
 
-        y_pred_rf = np.exp(grid_rf.predict(X_test)) - epsilon 
-        y_pred_train = np.exp(grid_rf.predict(X_combined)) - epsilon
+        best_rf = grid_rf.best_estimator_
+
+        mapie_reg = CrossConformalRegressor(
+            estimator=best_rf,
+            confidence_level=0.95,
+            cv = pds
+        )
+
+        mapie_reg.fit_conformalize(X_combined, y_combined)
+
+        y_pred_rf_cp, y_interval = mapie_reg.predict_interval(X_test)
+        y_pred_cp_train, y_interval_train = mapie_reg.predict_interval(X_combined)
+
+        lower_bound = np.exp(y_interval[:, 0, 0]) - epsilon
+        upper_bound = np.exp(y_interval[:, 1, 0]) - epsilon
+
+        y_pred_rf = np.exp(best_rf.predict(X_test)) - epsilon
+        y_pred_train = np.exp(best_rf.predict(X_combined)) - epsilon
+        y_test = np.exp(y_test) - epsilon
 
         results_rf = pd.DataFrame({
              'actual': y_test,   
@@ -661,7 +678,7 @@ class Model:
         rmse_rf_train = root_mean_squared_error(y_combined, y_pred_train)
 
         if canton != "full":
-             self.calculate_confint(var, momento, canton, "rf", X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, epsilon, grid_rf)
+             self.serie_temp_canton(var, "rf", momento, canton, lower_bound, upper_bound)
         # else:
         #     print(f"""MAE rf: {round(mae_rf, 3)}
         #     RMSE rf: {round(rmse_rf, 3)}
