@@ -16,7 +16,7 @@ from xgboost import XGBRegressor
 from sklearn.inspection import permutation_importance
 from sklearn.feature_selection import RFECV
 from skopt import BayesSearchCV
-# from tsbootstrap import CircularBlockBootstrap
+from arch.bootstrap import CircularBlockBootstrap
 from mapie.regression import CrossConformalRegressor
 
 
@@ -647,29 +647,29 @@ class Model:
 
         best_rf = grid_rf.best_estimator_
 
-        mapie_reg = CrossConformalRegressor(
-            estimator=best_rf,
-            confidence_level=0.95,
-            cv = pds
-        )
+        # mapie_reg = CrossConformalRegressor(
+        #     estimator=best_rf,
+        #     confidence_level=0.95,
+        #     cv = pds
+        # )
 
-        mapie_reg.fit_conformalize(X_combined, y_combined)
+        # mapie_reg.fit_conformalize(X_combined, y_combined)
 
-        y_pred_rf_cp, y_interval = mapie_reg.predict_interval(X_test)
-        y_pred_cp_train, y_interval_train = mapie_reg.predict_interval(X_combined)
+        # y_pred_rf_cp, y_interval = mapie_reg.predict_interval(X_test)
+        # y_pred_cp_train, y_interval_train = mapie_reg.predict_interval(X_combined)
 
-        lower_bound = np.exp(y_interval[:, 0, 0]) - epsilon
-        upper_bound = np.exp(y_interval[:, 1, 0]) - epsilon
+        # lower_bound = np.exp(y_interval[:, 0, 0]) - epsilon
+        # upper_bound = np.exp(y_interval[:, 1, 0]) - epsilon
 
         y_pred_rf = np.exp(best_rf.predict(X_test)) - epsilon
         y_pred_train = np.exp(best_rf.predict(X_combined)) - epsilon
         y_test = np.exp(y_test) - epsilon
 
-        results_rf = pd.DataFrame({
-             'actual': y_test,   
-             'pred': y_pred_rf, 
-             "week_canton": test["week_canton"].values
-        })
+        # results_rf = pd.DataFrame({
+        #      'actual': y_test,   
+        #      'pred': y_pred_rf, 
+        #      "week_canton": test["week_canton"].values
+        # })
 
         # results_rf.to_csv(f'../../data/model_results/{momento}/results_{var}_rf_{momento}_{canton}.csv')
 
@@ -677,8 +677,8 @@ class Model:
         rmse_rf = root_mean_squared_error(y_test, y_pred_rf)
         rmse_rf_train = root_mean_squared_error(y_combined, y_pred_train)
 
-        if canton != "full":
-             self.serie_temp_canton(var, "rf", momento, canton, lower_bound, upper_bound)
+        # if canton != "full":
+        #      self.serie_temp_canton(var, "rf", momento, canton, lower_bound, upper_bound)
         # else:
         #     print(f"""MAE rf: {round(mae_rf, 3)}
         #     RMSE rf: {round(rmse_rf, 3)}
@@ -1223,17 +1223,11 @@ class Model:
                 tick.tick2line.set_visible(False)
                 tick.gridline.set_visible(False) 
 
-    def calculate_confint(self, var, momento, canton, reg_type, X_combined, y_combined, X_test, y_test, X_combined_scaled,X_test_scaled, epsilon, grid):
+    def confint_nrmse(self, var, momento, canton, reg_type, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, epsilon, grid):
 
         best_params = grid.best_params_
 
-        mbb = CircularBlockBootstrap(
-            n_bootstraps = 10, 
-            block_length = 52,
-            rng = 42
-        )
-
-        models = []
+        y_test = np.exp(y_test) - epsilon
 
         if reg_type == "reg":
             X_arr = X_combined_scaled.values if hasattr(X_combined, 'values') else X_combined_scaled
@@ -1242,14 +1236,19 @@ class Model:
             X_arr = X_combined.values if hasattr(X_combined, 'values') else X_combined
             y_arr = y_combined.values if hasattr(y_combined, 'values') else y_combined
 
-        bs_result = list(mbb.bootstrap(X_arr, return_indices=True))
+        bs = CircularBlockBootstrap(
+            52,
+            X_arr,
+            y_arr,
+            seed = 42
+        )
 
-        for boot_data in bs_result:
+        models = []
 
-            X_boot_data, indices = boot_data
-            
-            X_boot = X_boot_data  
-            y_boot = y_arr[indices]  
+        for data in bs.bootstrap(10):
+
+            X_boot = data[0][0]
+            y_boot = data[0][1]
 
             rf = RandomForestRegressor(**best_params, random_state = 42)
 
@@ -1259,29 +1258,20 @@ class Model:
 
         if reg_type == "reg":
             predictions = np.array([model.predict(X_test_scaled) for model in models])
+            predictions = np.exp(predictions) - epsilon
+            nrmse = np.array([root_mean_squared_error(y_true = y_test, y_pred = pred) / np.mean(y_test) for pred in predictions])
         else:
             predictions = np.array([model.predict(X_test) for model in models])
+            predictions = np.exp(predictions) - epsilon
+            nrmse = np.array([root_mean_squared_error(y_true = y_test, y_pred = pred) / np.mean(y_test) for pred in predictions])
 
-        predictions = np.exp(predictions) - epsilon
+        y_pred_point = np.mean(nrmse)
 
-        y_pred_point = np.mean(predictions, axis=0)
+        lower_bound = np.percentile(nrmse, 2.5)
+        upper_bound = np.percentile(nrmse, 97.5)
 
-        lower_bound = np.percentile(predictions, 2.5, axis=0)
-        upper_bound = np.percentile(predictions, 97.5, axis=0)
-
-        fig, ax = plt.subplots()
-
-        y_test_actual = np.exp(y_test) - epsilon
-
-        ax.plot(range(len(y_test)), y_test_actual, label='Reales', marker='o')
-        ax.plot(range(len(y_pred_point)), y_pred_point, label='Predichas', marker='o')
-        ax.set_ylabel(f"{var}")
-        ax.set_xlabel("Momento")
-        ax.set_title(f"{var} real vs predicha para {canton} en {momento}")
-
-        ax.fill_between(range(len(y_pred_point)), lower_bound, upper_bound, alpha = 0.2)
-
-        plt.show()
+        print(f"point estimate: {round(y_pred_point, 2)}")
+        print(f"lower bound: {round(lower_bound, 2)}, upper bound: {round(upper_bound, 2)}")
 
     def model_results(self, var, momento, canton = "full"):
         if var == "cases":
