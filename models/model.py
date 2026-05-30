@@ -1078,14 +1078,14 @@ class Model:
                 "estimator__ccp_alpha": [0],
                 "estimator__criterion": ["gini"],
             } 
-            grid = GridSearchCV(clf.tuned, param_grid, cv=pds, n_jobs=-1, verbose=10)
-            grid.fit(X_combined, y_train_bin)
-            y_pred_classi = grid.predict(X_test)
+            grid_classi = GridSearchCV(clf.tuned, param_grid, cv=pds, n_jobs=-1, verbose=10)
+            grid_classi.fit(X_combined, y_train_bin)
+            y_pred_classi = grid_classi.predict(X_test)
             print(classification_report(y_test_bin, y_pred_classi))
             # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
 
         elif classi_type == "xgb" and y_test_bin.nunique() >= 2:
-            clf = XGBClassifier(random_state=42, eval_metric="logloss")
+            clf = XGBClassifier(random_state=42)
             clf.tuned = TunedThresholdClassifierCV(estimator = clf, scoring = "roc_auc", cv = 5)
             param_grid = {
                 "estimator__max_depth": [5],
@@ -1093,20 +1093,21 @@ class Model:
                 "estimator__n_estimators": [50],
                 "estimator__reg_lambda": [0],
             }
-            grid = GridSearchCV(clf.tuned, param_grid, cv=5, n_jobs=-1, verbose=0)
-            grid.fit(X_combined, y_train_bin)
-            y_pred_classi = grid.predict(X_test)
+            grid_classi = GridSearchCV(clf.tuned, param_grid, cv=5, n_jobs=-1, verbose=0)
+            grid_classi.fit(X_combined, y_train_bin)
+            y_pred_classi = grid_classi.predict(X_test)
             print(classification_report(y_test_bin, y_pred_classi))
             # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
         elif y_test_bin.nunique() < 2:
             print("Only one class present in test set for classification. Skipping classification step.")
+            grid_classi = None
             y_pred_classi = np.repeat(y_test_bin.unique(), len(y_test_bin))  
         else:
             print("Invalid classification model")
 
         mask_pos_train = y_combined_actual > 0 
         X_combined_1 = X_combined.loc[mask_pos_train].reset_index(drop=True)
-        y_combined_1 = y_combined_actual.loc[mask_pos_train].reset_index(drop=True)
+        y_combined_1 = y_combined.loc[mask_pos_train].reset_index(drop=True)
         if mask_pos_train.sum() == 0:
             print("No positive cases in train available for regression after filtering.")
         
@@ -1142,28 +1143,28 @@ class Model:
                 "criterion": ["squared_error", "absolute_error"]
             }
 
-            grid = GridSearchCV(
+            grid_reg = GridSearchCV(
                 estimator=reg_model, 
                 param_grid=param_grid, 
-                cv=pds, 
+                cv=pds_1, 
                 scoring='neg_mean_squared_error', 
                 n_jobs=-1
             )
             
-            grid.fit(X_combined, y_combined)
-            reg_model = grid.best_estimator_
-            y_pred_reg = grid.predict(X_test)
+            grid_reg.fit(X_combined_1, y_combined_1)
+            reg_model = grid_reg.best_estimator_
+            y_pred_reg = grid_reg.predict(X_test)
             y_pred_train = reg_model.predict(X_combined_1)
 
         elif reg_type == "xgb":
-            reg_model = XGBRegressor(random_state=42, eval_metric="rmse")
+            reg_model = XGBRegressor(random_state=42)
             param_grid = {
                 "max_depth": [5],
                 "learning_rate": [0.1],
                 "n_estimators": [50],
                 "reg_lambda": [0],
             }
-            grid = GridSearchCV(
+            grid_reg = GridSearchCV(
                 reg_model,
                 param_grid,
                 cv=pds_1,
@@ -1171,17 +1172,16 @@ class Model:
                 verbose=0,
                 scoring="neg_mean_squared_error",
             )
-            grid.fit(X_combined_1, y_combined_1)
-            reg_model = grid.best_estimator_
-            y_pred_reg = grid.predict(X_test)
+            grid_reg.fit(X_combined_1, y_combined_1)
+            reg_model = grid_reg.best_estimator_
+            y_pred_reg = grid_reg.predict(X_test)
             y_pred_train = reg_model.predict(X_combined_1)
 
         else:
             print("Invalid regression model")
 
-        print(y_pred_reg.shape)
-        print(X_test.shape)
         y_test_actual = np.exp(y_test) - epsilon
+        y_pred_reg = np.exp( y_pred_reg) - epsilon
         y_pred_reg = np.where(y_pred_classi == 0, 0, y_pred_reg)
 
         results = pd.DataFrame({
@@ -1200,11 +1200,11 @@ class Model:
         mse = rmse ** 2
         rmse_train = root_mean_squared_error(np.exp(y_combined_1) - epsilon, y_pred_train)
 
-        if canton != "full":
-            self.serie_temp_canton(var, f"hybrid_{classi_type}_{reg_type}", momento, canton)
-        else:
-            print(f"MAE: {round(mae, 3)}")
-            print(f"RMSE: {round(rmse, 3)}")
+        # if canton != "full":
+        #     self.serie_temp_canton(var, f"hybrid_{classi_type}_{reg_type}", momento, canton)
+        # else:
+        #     print(f"MAE: {round(mae, 3)}")
+        #     print(f"RMSE: {round(rmse, 3)}")
 
         nrmse = rmse / np.mean(results["actual"])
         print(f"nrmse: {round(nrmse, 2)}")
@@ -1213,7 +1213,7 @@ class Model:
         print(f"RMSE train: {round(rmse_train, 3)}")
         print(f"MSE train: {round(rmse_train ** 2, 3)}")
 
-        return reg_model
+        return grid_classi, grid_reg
 
     def ticks_years_top(self, ax, n):
         [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n != 0]
@@ -1223,18 +1223,14 @@ class Model:
                 tick.tick2line.set_visible(False)
                 tick.gridline.set_visible(False) 
 
-    def confint_nrmse(self, var, momento, canton, reg_type, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, epsilon, grid):
+    def confint_nrmse(self, var, momento, canton, reg_type, X_combined, y_combined, X_test, y_test, X_combined_scaled, X_test_scaled, epsilon, grid_reg, grid_classi = None):
 
-        best_params = grid.best_params_
+        best_params_reg = grid_reg.best_params_
 
         y_test = np.exp(y_test) - epsilon
 
-        if reg_type == "reg":
-            X_arr = X_combined_scaled.values if hasattr(X_combined, 'values') else X_combined_scaled
-            y_arr = y_combined.values if hasattr(y_combined, 'values') else y_combined
-        else:
-            X_arr = X_combined.values if hasattr(X_combined, 'values') else X_combined
-            y_arr = y_combined.values if hasattr(y_combined, 'values') else y_combined
+        X_arr = X_combined.values if hasattr(X_combined, 'values') else X_combined
+        y_arr = y_combined.values if hasattr(y_combined, 'values') else y_combined
 
         bs = CircularBlockBootstrap(
             52,
@@ -1244,26 +1240,70 @@ class Model:
         )
 
         models = []
+        models_classi = []
+
+        if grid_classi == None and reg_type == "hrf":
+                print("Only one class present in test set for classification. Skipping classification step.")
+        elif grid_classi == None and reg_type == "hxgb":
+                print("Only one class present in test set for classification. Skipping classification step.")
 
         for data in bs.bootstrap(10):
 
             X_boot = data[0][0]
             y_boot = data[0][1]
 
-            rf = RandomForestRegressor(**best_params, random_state = 42)
+            if reg_type == "rf":
+                modelo = RandomForestRegressor(**best_params_reg, random_state = 42)
+                modelo.fit(X_boot, y_boot)
+                models.append(modelo)
+            elif reg_type == "xgb":
+                modelo = XGBRegressor(**best_params_reg, random_state = 42) 
+                modelo.fit(X_boot, y_boot)
+                models.append(modelo)
+            elif reg_type == "hrf":
+                y_boot_actual = np.exp(y_boot) - epsilon
+                y_boot_bin = pd.Series((y_boot_actual > 0).astype(int))
 
-            rf.fit(X_boot, y_boot)
+                if grid_classi != None:
+                    best_params_classi = grid_classi.best_params_
+                    modelo_classi = RandomForestClassifier(**best_params_classi, random_state = 42)
+                    modelo_classi.fit(X_boot, y_boot_bin)
+                    models_classi.append(modelo_classi)
 
-            models.append(rf)
+                mask_pos_train = y_boot_actual > 0 
+                X_boot_1 = X_boot[mask_pos_train]
+                y_boot_1 = y_boot[mask_pos_train]
+                modelo_reg = RandomForestRegressor(**best_params_reg, random_state = 42)
+                modelo_reg.fit(X_boot_1, y_boot_1)
+                models.append(modelo_reg)
+            elif reg_type == "hxgb":
+                y_boot_actual = np.exp(y_boot) - epsilon
+                y_boot_bin = pd.Series((y_boot_actual > 0).astype(int))
 
-        if reg_type == "reg":
-            predictions = np.array([model.predict(X_test_scaled) for model in models])
-            predictions = np.exp(predictions) - epsilon
-            nrmse = np.array([root_mean_squared_error(y_true = y_test, y_pred = pred) / np.mean(y_test) for pred in predictions])
-        else:
+                if grid_classi != None:
+                    best_params_classi = grid_classi.best_params_
+                    modelo_classi = XGBClassifier(**best_params_classi, random_state = 42)
+                    modelo_classi.fit(X_boot, y_boot_bin)
+                    models_classi.append(modelo_classi)
+
+                mask_pos_train = y_boot_actual > 0 
+                X_boot_1 = X_boot[mask_pos_train]
+                y_boot_1 = y_boot[mask_pos_train]
+                modelo_reg = XGBRegressor(**best_params_reg, random_state = 42)
+                modelo_reg.fit(X_boot_1, y_boot_1)
+                models.append(modelo_reg)
+
+        if grid_classi == None:                     
             predictions = np.array([model.predict(X_test) for model in models])
             predictions = np.exp(predictions) - epsilon
-            nrmse = np.array([root_mean_squared_error(y_true = y_test, y_pred = pred) / np.mean(y_test) for pred in predictions])
+        else: 
+            predictions_classi = np.array([model.predict(X_test) for model in models_classi])
+            predictions_reg = np.array([model.predict(X_test) for model in models])
+            predictions_reg = np.exp(predictions_reg) - epsilon
+            predictions = np.array([np.where(y_pred_classi == 0, 0, y_pred_reg) for y_pred_classi, y_pred_reg in zip(predictions_classi, predictions_reg)])
+
+
+        nrmse = np.array([root_mean_squared_error(y_true = y_test, y_pred = pred) / np.mean(y_test) for pred in predictions])
 
         y_pred_point = np.mean(nrmse)
 
