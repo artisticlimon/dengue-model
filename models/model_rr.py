@@ -14,8 +14,9 @@ from mapie.regression import CrossConformalRegressor
 
 
 class Model:
-    def __init__(self, df):
-        self.df = df.copy()
+    def __init__(self, df, canton):
+        self.canton = canton
+        self.df = df[df["week_canton"].str.contains(canton)]
         self.df.drop(columns = ["tmax_mean"], inplace = True)
         self.df.drop(columns = ["tmin_mean"], inplace = True)
         self.df.drop(columns = ["temp_prom"], inplace = True)
@@ -134,43 +135,34 @@ class Model:
 
         return X_combined, y_combined, X_test, y_test, test, pds, epsilon
 
-    def serie_temp_canton(self, model_type, canton, lower_bound, upper_bound):
+    def serie_temp_canton(self, model_type, lower_bound, upper_bound):
 
-        results = pd.read_csv(f'../../data/model_results/results_{model_type}_{canton}.csv')
-
-        rmse = root_mean_squared_error(results["actual"], results["pred"])
-        mse = rmse ** 2
-        mae = mean_absolute_error(results["actual"], results["pred"])
+        results = pd.read_csv(f'../../data/model_results/results_{model_type}_{self.canton}.csv')
+        
+        results['week_canton'] = results['week_canton'].str.extract(r'(\d{4}-\d+)').iloc[:, 0].tolist()
 
         fig, ax = plt.subplots()
-        ax.plot(results['week_canton'], results["actual"], label='Reales', marker='o')
-        ax.plot(results['week_canton'], results["pred"], label='Predichos', marker='o')
-        ax.fill_between(x = results['week_canton'], y1 = lower_bound, y2 = upper_bound, alpha = 0.2)
+        ax.plot(results['week_canton'], results["actual"], label='Real', marker='o', linestyle = "dashed", color = "blue")
+        ax.plot(results['week_canton'], results["pred"], label='Predicted', marker='o', color = "green")
+        ax.fill_between(x = results['week_canton'], label = "CI (95%)", y1 = lower_bound, y2 = upper_bound, alpha = 0.2, color = "green")
+        ax.legend(loc = "upper right")
         self.ticks_years_top(ax, 20)
         ax.set_xlabel('Week')
         ax.set_ylabel(f'Relative risk')
 
-        ax.text(0.9, 0.75, f'MSE: {mse:.2f}', transform=ax.transAxes, ha='center', fontsize=12)
-        ax.text(0.9, 0.68, f'RMSE: {rmse:.2f}', transform=ax.transAxes, ha='center', fontsize=12)
-        ax.text(0.9, 0.55, f'MAE: {mae:.2f}', transform=ax.transAxes, ha='center', fontsize=12)
-        ax.set_title(f"{model_type} for {canton}")
+        ax.set_title(f"{model_type} for {self.canton}")
         plt.show()
     
-    def importance_ml(self, canton, X_combined, X_test, y_test, model, model_type, var = "RR"):
+    def var_importance(self, X_combined, X_test, y_test, model_type, var = "RR"):
 
         try:
-            grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{canton}.joblib')
+            grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except: 
-            grid = joblib.load(f'../../models/saved_models/{model_type}_{canton}.joblib')
+            grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
         
-        model = grid.best_estimator
+        model = grid.best_estimator_
 
-        try:
-            effective_model = model.best_estimator_
-        except:
-            effective_model = model
-
-        r = permutation_importance(effective_model, X_test, y_test, n_repeats=30, random_state=0)
+        r = permutation_importance(model, X_test, y_test, n_repeats=30, random_state=0)
 
         imp_df = pd.DataFrame({"Feature": X_combined.columns[r.importances_mean.argsort()[::-1]], f"imp_{model_type}": r.importances_mean[r.importances_mean.argsort()[::-1]]})
 
@@ -181,19 +173,19 @@ class Model:
         ax.barh(imp_df_sorted["Feature"].tail(10), imp_df_sorted[f"imp_{model_type}"].tail(10))
         ax.bar_label(ax.containers[0], fmt='%.2f')
         ax.set_xlabel("Importance")
-        fig.suptitle(f"{model_type} permutation importance for {var} in {canton}")
+        fig.suptitle(f"{model_type} permutation importance for {var} in {self.canton}")
         plt.show()
 
         return imp_df
 
-    def rfecv_selection(self, model_type, X_combined, y_combined, X_test, y_test, canton, pds, var = "RR"):
+    def rfecv_selection(self, model_type, X_combined, y_combined, X_test, y_test, pds, var = "RR"):
 
         try:
-            grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{canton}.joblib')
+            grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except: 
-            grid = joblib.load(f'../../models/saved_models/{model_type}_{canton}.joblib')
+            grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
         
-        model = grid.best_estimator
+        model = grid.best_estimator_
 
         rfecv = RFECV(
             estimator=model,
@@ -239,7 +231,12 @@ class Model:
         plt.title(f"Feature Importance Selected by RFECV for {model_type} model of {var}")
         plt.show()
 
-    def prediction_intervals(self, X_combined, y_combined, X_test, epsilon, grid, pds):
+    def prediction_intervals(self, X_combined, y_combined, X_test, epsilon, model_type, pds):
+
+        try:
+            grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
+        except: 
+            grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
 
         best_rf = grid.best_estimator_
 
@@ -260,7 +257,7 @@ class Model:
 
         return y_pred_point, lower_bound, upper_bound
 
-    def rf_reg(self, canton, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
+    def rf_reg(self, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
         rf = RandomForestRegressor(oob_score=True, random_state=42)
 
         param_grid_rf = {
@@ -288,13 +285,13 @@ class Model:
               "week_canton": test["week_canton"].values
         })
 
-        results_rf.to_csv(f'../../data/model_results/results_rf_{canton}.csv')
+        results_rf.to_csv(f'../../data/model_results/results_rf_{self.canton}.csv')
 
-        joblib.dump(grid_rf, f'../../models/saved_models/rf_{canton}.joblib')
+        joblib.dump(grid_rf, f'../../models/saved_models/rf_{self.canton}.joblib')
 
-        print(f"RF Model Ready for {canton}")
+        print(f"RF Model Ready for {self.canton}")
 
-    def xgb_reg(self, canton, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
+    def xgb_reg(self, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
 
         xgb = XGBRegressor(random_state=42)
 
@@ -324,13 +321,13 @@ class Model:
             "week_canton": test["week_canton"].values
         })
 
-        results_xgb.to_csv(f'../../data/model_results/results_xgb_{canton}.csv')
+        results_xgb.to_csv(f'../../data/model_results/results_xgb_{self.canton}.csv')
 
-        joblib.dump(grid_xgb, f'../../models/saved_models/xgb_{canton}.joblib')
+        joblib.dump(grid_xgb, f'../../models/saved_models/xgb_{self.canton}.joblib')
 
-        print(f"XGB Model Ready for {canton}")
+        print(f"XGB Model Ready for {self.canton}")
 
-    def hybrid(self, canton, model_type, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
+    def hybrid(self, model_type, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
 
         X_combined = X_combined.reset_index(drop=True)
         X_test = X_test.reset_index(drop=True)
@@ -445,14 +442,14 @@ class Model:
             "week_canton": test["week_canton"].values,
         })
 
-        results.to_csv(f"../../data/model_results/results_{model_type}_{canton}.csv", index=False)
+        results.to_csv(f"../../data/model_results/results_{model_type}_{self.canton}.csv", index=False)
 
         if grid_classi != None:
-            joblib.dump(grid_classi, f'../../models/saved_models/{model_type}_classi_{canton}.joblib')
+            joblib.dump(grid_classi, f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
 
-        joblib.dump(grid_reg, f'../../models/saved_models/{model_type}_reg_{canton}.joblib')
+        joblib.dump(grid_reg, f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
 
-        print(f"{model_type} ready for {canton}")
+        # print(f"{model_type} ready for {self.canton}")
 
     def ticks_years_top(self, ax, n):
         [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n != 0]
@@ -462,25 +459,26 @@ class Model:
                 tick.tick2line.set_visible(False)
                 tick.gridline.set_visible(False) 
 
-    def calculate_nrmse(self, model_type, canton):
-        results = pd.read_csv(f'../../data/model_results/results_{model_type}_{canton}.csv')
+    def calculate_nrmse(self, model_type):
+        results = pd.read_csv(f'../../data/model_results/results_{model_type}_{self.canton}.csv')
 
         rmse = root_mean_squared_error(results["actual"], results["pred"])
 
-        nrmse_rf = rmse / np.mean(results["actual"])
-        print(f"nrmse: {round(nrmse_rf, 2)}")
+        nrmse = rmse / np.mean(results["actual"])
 
-    def confint_nrmse(self, canton, model_type, X_combined, y_combined, X_test, y_test, epsilon, n_bootstraps = 500):
+        return self.canton, nrmse
+
+    def confint_nrmse(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, n_bootstraps = 500):
 
         try:
-            grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{canton}.joblib')
+            grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
         except: 
             grid_classi = None
 
         try:
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_{canton}.joblib')
+            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except: 
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{canton}.joblib')
+            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
         
         best_params_reg = grid_reg.best_params_
 
