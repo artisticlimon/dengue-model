@@ -261,8 +261,8 @@ class Model:
         rf = RandomForestRegressor(oob_score=True, random_state=42)
 
         param_grid_rf = {
-            'max_depth': [5, 6, 7, 8],
-            'min_samples_split': [10, 100, 500],
+            'max_depth': [3, 5, 7, 9],
+            'min_samples_split': [10, 50, 75, 100, 150],
             'ccp_alpha': [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10], 
             "criterion": ["squared_error", "absolute_error"]
         }
@@ -296,12 +296,12 @@ class Model:
         xgb = XGBRegressor(random_state=42)
 
         param_grid_xgb = {
-            'max_depth': [5, 6, 7, 8],
-            'learning_rate': [0.1, 0.3, 0.05],
-            'n_estimator': [50, 100, 150], 
-            "criterion": ["friednman_mse", "squared_error"]
+            'max_depth': [3, 5, 7, 9],
+            'learning_rate': [0.1, 0.3, 0.05, 0.01],
+            'n_estimators': [10, 50, 75, 100, 150], 
+            "eval_metric": ["squared_error", "absolute_error"],
+            "reg_lambda": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10]
         }
-
         grid_xgb = GridSearchCV(
             estimator=xgb, 
             param_grid=param_grid_xgb, 
@@ -346,10 +346,10 @@ class Model:
             clf = RandomForestClassifier(oob_score=True, random_state=42)
             clf.tuned = TunedThresholdClassifierCV(estimator = clf, cv = 5)
             param_grid = {
-                "estimator__max_depth": [5],
-                "estimator__min_samples_split": [10],
-                "estimator__ccp_alpha": [0],
-                "estimator__criterion": ["gini"],
+                "estimator__max_depth": [3, 5, 7, 9],
+                "estimator__min_samples_split": [10, 50, 75, 100, 150],
+                "estimator__ccp_alpha": [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
+                "estimator__criterion": ["gini", "entropy"],
             } 
             grid_classi = GridSearchCV(clf.tuned, param_grid, cv=pds, n_jobs=-1, verbose=10)
             grid_classi.fit(X_combined, y_train_bin)
@@ -361,10 +361,11 @@ class Model:
             clf = XGBClassifier(random_state=42)
             clf.tuned = TunedThresholdClassifierCV(estimator = clf, scoring = "roc_auc", cv = 5)
             param_grid = {
-                "estimator__max_depth": [5],
-                "estimator__learning_rate": [0.3],
-                "estimator__n_estimators": [50],
-                "estimator__reg_lambda": [0],
+                "estimator__max_depth": [3, 5, 7, 9],
+                "estimator__learning_rate": [0.1, 0.3, 0.05, 0.01],
+                "estimator__n_estimators": [10, 50, 75, 100, 150],
+                "estimator__reg_lambda": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
+                "estimator__eval_metric": ["merror", "mlogloss"]
             }
             grid_classi = GridSearchCV(clf.tuned, param_grid, cv=5, n_jobs=-1, verbose=0)
             grid_classi.fit(X_combined, y_train_bin)
@@ -390,11 +391,11 @@ class Model:
         if model_type == "hrf":
             reg_model = RandomForestRegressor(oob_score=True, random_state=42)
 
-            param_grid= {
-                'max_depth': [5, 6, 7, 8],
-                'min_samples_split': [10, 100, 500],
-                'ccp_alpha': [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10], 
-                "criterion": ["squared_error", "absolute_error"]
+            param_grid = {
+                        'max_depth': [3, 5, 7, 9],
+                        'min_samples_split': [10, 50, 75, 100, 150],
+                        'ccp_alpha': [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10], 
+                        "criterion": ["squared_error", "absolute_error"]
             }
 
             grid_reg = GridSearchCV(
@@ -412,11 +413,13 @@ class Model:
         elif model_type == "hxgb":
             reg_model = XGBRegressor(random_state=42)
             param_grid = {
-                "max_depth": [5],
-                "learning_rate": [0.1],
-                "n_estimators": [50],
-                "reg_lambda": [0],
+                'max_depth': [3, 5, 7, 9],
+                'learning_rate': [0.1, 0.3, 0.05, 0.01],
+                'n_estimators': [10, 50, 75, 100, 150], 
+                "eval_metric": ["squared_error", "absolute_error"],
+                "reg_lambda": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10]
             }
+            
             grid_reg = GridSearchCV(
                 reg_model,
                 param_grid,
