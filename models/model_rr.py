@@ -494,20 +494,20 @@ class Model:
 
         try:
             grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
-        except: 
+        except FileNotFoundError: 
             grid_classi = None
 
         try:
             grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
-        except: 
+        except FileNotFoundError: 
             grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
         
         best_params_reg = grid_reg.best_params_
 
         y_test = np.exp(y_test) - epsilon
 
-        X_arr = X_combined.values if hasattr(X_combined, 'values') else X_combined
-        y_arr = y_combined.values if hasattr(y_combined, 'values') else y_combined
+        X_arr = X_combined
+        y_arr = y_combined
 
         bs = CircularBlockBootstrap(
             52,
