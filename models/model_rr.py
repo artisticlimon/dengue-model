@@ -11,6 +11,7 @@ from sklearn.inspection import permutation_importance
 from sklearn.feature_selection import RFECV
 from arch.bootstrap import CircularBlockBootstrap
 from mapie.regression import CrossConformalRegressor
+from sklearn.base import clone
 
 
 class Model:
@@ -153,24 +154,24 @@ class Model:
         ax.set_title(f"{model_type} for {self.canton}")
         plt.show()
     
-    def var_importance(self, X_combined, X_test, y_test, model_type, var = "RR"):
+    def var_importance(self, X_test, y_test, model_type, repeats, var = "RR"):
 
         try:
             grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
-        except: 
+        except FileNotFoundError: 
             grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
         
         model = grid.best_estimator_
 
-        r = permutation_importance(model, X_test, y_test, n_repeats=30, random_state=0)
+        r = permutation_importance(model, X_test, y_test, n_repeats=repeats, random_state=42, scoring="neg_root_mean_squared_log_error")
 
-        imp_df = pd.DataFrame({"Feature": X_combined.columns[r.importances_mean.argsort()[::-1]], f"imp_{model_type}": r.importances_mean[r.importances_mean.argsort()[::-1]]})
+        imp_df = pd.DataFrame({"Feature": X_test.columns, f"imp_{model_type}": r.importances_mean, f"std_{model_type}": r.importances_std}).sort_values(by=f"imp_{model_type}", ascending=False).reset_index(drop=True)
 
         print(imp_df)
 
         fig, ax = plt.subplots(figsize=(10, 8))
-        imp_df_sorted = imp_df.sort_values(by = f"imp_{model_type}", ascending=True)
-        ax.barh(imp_df_sorted["Feature"].tail(10), imp_df_sorted[f"imp_{model_type}"].tail(10))
+        imp_df_sorted = imp_df.head(10).sort_values(by=f"imp_{model_type}", ascending=True)
+        ax.barh(imp_df_sorted["Feature"], imp_df_sorted[f"imp_{model_type}"])
         ax.bar_label(ax.containers[0], fmt='%.2f')
         ax.set_xlabel("Importance")
         fig.suptitle(f"{model_type} permutation importance for {var} in {self.canton}")
@@ -178,11 +179,11 @@ class Model:
 
         return imp_df
 
-    def rfecv_selection(self, model_type, X_combined, y_combined, X_test, y_test, pds, var = "RR"):
+    def rfecv_selection(self, model_type, X_combined, y_combined, X_test, y_test, pds, repeats, var = "RR"):
 
         try:
             grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
-        except: 
+        except FileNotFoundError: 
             grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
         
         model = grid.best_estimator_
@@ -192,18 +193,27 @@ class Model:
             step=1,
             cv=pds,
             min_features_to_select=5,
-            n_jobs=-1
+            n_jobs=-1,
+            scoring="neg_root_mean_squared_log_error"
         )
 
         rfecv.fit(X_combined, y_combined)
 
+        selected_mask = rfecv.support_
+        selected_features = X_combined.columns[selected_mask].tolist()
+
         print(f'Optimal number of features for {var} and {model_type}: {rfecv.n_features_}')
-        selected_rfe = [f for f, s in zip(X_combined.columns.tolist(), rfecv.support_) if s]
-        print(f'Selected features: {selected_rfe}')
+        print(f'Selected features: {selected_features}')
+
+        if "n_features" in rfecv.cv_results_:
+            n_features_range = rfecv.cv_results_["n_features"]
+        else:
+            n_features_range = range(
+                rfecv.min_features_to_select,
+                rfecv.min_features_to_select + len(rfecv.cv_results_["mean_test_score"])
+            )
 
         fig, ax = plt.subplots(figsize=(9, 4))
-        n_features_range = range(rfecv.min_features_to_select,
-                                rfecv.min_features_to_select + len(rfecv.cv_results_['mean_test_score']))
         ax.plot(n_features_range, rfecv.cv_results_['mean_test_score'], linewidth=2, marker='o', markersize=4)
         ax.fill_between(
             n_features_range,
@@ -213,21 +223,30 @@ class Model:
         )
         ax.axvline(rfecv.n_features_, linestyle='--', linewidth=2,
                 label=f'Optimal: {rfecv.n_features_} features')
-        ax.set_title(f'RFECV: Metric (AUC or) vs Number of Features {var} and {model_type}', pad=10)
+        ax.set_title(f'RFECV score vs Number of Features {var} and {model_type}', pad=10)
         ax.set_xlabel('Number of Features Selected')
-        ax.set_ylabel('Cross-Validated metric (AUC or)')
+        ax.set_ylabel('Cross-Validated score')
         ax.legend()
         plt.tight_layout()
         plt.show()
 
-        feature_names = X_combined.columns[rfecv.support_]
-        
-        importance_scores = permutation_importance(rfecv.estimator_, X_test[feature_names], y_test, n_repeats=30, random_state=0).importances_mean
+        final_model = clone(model)
+        final_model.fit(X_combined[selected_features], y_combined)
 
-        df_importance = pd.DataFrame({'Feature': feature_names, 'Importance': importance_scores})
+        final_model_pred = final_model.predict(X_test[selected_features])
+        rmse = root_mean_squared_error(y_test, final_model_pred)
+
+        nrmse = rmse / np.mean(y_test)
+
+        print(f"New NRMSE with selected features: {nrmse:.4f}")
+        
+        importance_scores = permutation_importance(final_model, X_test[selected_features], y_test, n_repeats=repeats, random_state=42, scoring="neg_root_mean_squared_log_error").importances_mean
+
+        df_importance = pd.DataFrame({'Feature': selected_features, 'Importance': importance_scores})
         df_importance = df_importance.sort_values(by='Importance', ascending=True)
 
-        df_importance.plot(kind='barh', x='Feature', y='Importance', legend=False)
+        df_importance.plot(kind='barh', x='Feature', y='Importance', legend=False,
+        figsize=(8, max(4, 0.35 * len(df_importance))))
         plt.title(f"Feature Importance Selected by RFECV for {model_type} model of {var}")
         plt.show()
 
@@ -299,7 +318,7 @@ class Model:
             'max_depth': [3, 5, 7, 9],
             'learning_rate': [0.1, 0.3, 0.05, 0.01],
             'n_estimators': [10, 50, 75, 100, 150], 
-            "eval_metric": ["squared_error", "absolute_error"],
+            "eval_metric": ["rmse", "mae"],
             "reg_lambda": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10]
         }
         grid_xgb = GridSearchCV(
@@ -416,7 +435,7 @@ class Model:
                 'max_depth': [3, 5, 7, 9],
                 'learning_rate': [0.1, 0.3, 0.05, 0.01],
                 'n_estimators': [10, 50, 75, 100, 150], 
-                "eval_metric": ["squared_error", "absolute_error"],
+                "eval_metric": ["rmse", "mae"],
                 "reg_lambda": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10]
             }
             
