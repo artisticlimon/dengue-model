@@ -362,32 +362,50 @@ class Model:
 
         if model_type == "hrf" and y_test_bin.nunique() >= 2:
             clf = RandomForestClassifier(oob_score=True, random_state=42)
-            clf.tuned = TunedThresholdClassifierCV(estimator = clf, cv = pds, scoring = "roc_auc", n_jobs=-1)
             param_grid = {
-                "estimator__max_depth": [3, 5, 7, 9],
-                "estimator__min_samples_split": [10, 50, 75, 100, 150],
-                "estimator__ccp_alpha": [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
-                "estimator__criterion": ["gini", "entropy"],
-            } 
-            grid_classi = GridSearchCV(clf.tuned, param_grid, cv=pds, n_jobs=-1, verbose=0)
+                "max_depth": [3, 5, 7, 9],
+                "min_samples_split": [10, 50, 75, 100, 150],
+                "ccp_alpha": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
+                "criterion": ["gini", "entropy"]
+            }
+            grid_classi = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, verbose=0, scoring="roc_auc")
             grid_classi.fit(X_combined, y_train_bin)
-            y_pred_classi = grid_classi.predict(X_test)
+            
+            best_clf = grid_classi.best_estimator_
+            clf_tuned = TunedThresholdClassifierCV(
+                estimator=best_clf,
+                scoring="roc_auc",
+                cv=5,  
+                n_jobs=-1
+            )
+            clf_tuned.fit(X_combined, y_train_bin)
+            y_pred_classi = clf_tuned.predict(X_test)
             print(classification_report(y_test_bin, y_pred_classi))
             # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
 
         elif model_type == "hxgb" and y_test_bin.nunique() >= 2:
             clf = XGBClassifier(random_state=42)
-            clf.tuned = TunedThresholdClassifierCV(estimator = clf, scoring = "roc_auc", cv = pds, n_jobs = -1)
             param_grid = {
-                "estimator__max_depth": [3, 5, 7, 9],
-                "estimator__learning_rate": [0.1, 0.3, 0.05, 0.01],
-                "estimator__n_estimators": [10, 50, 75, 100, 150],
-                "estimator__reg_lambda": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
-                "estimator__eval_metric": ["merror", "mlogloss"]
+                "max_depth": [3, 5, 7, 9],
+                "learning_rate": [0.1, 0.3, 0.05, 0.01],
+                "n_estimators": [10, 50, 75, 100, 150],
+                "reg_lambda": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
+                "eval_metric": ["logloss"]
             }
-            grid_classi = GridSearchCV(clf.tuned, param_grid, cv=pds, n_jobs=-1, verbose=0)
+            grid_classi = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, scoring="roc_auc")
             grid_classi.fit(X_combined, y_train_bin)
-            y_pred_classi = grid_classi.predict(X_test)
+            best_clf = grid_classi.best_estimator_
+
+            clf_tuned = TunedThresholdClassifierCV(
+                estimator=best_clf,
+                scoring="roc_auc",
+                cv=5,  
+                n_jobs=-1
+            )
+            clf_tuned.fit(X_combined, y_train_bin)  
+            y_pred_classi = clf_tuned.predict(X_test)
+            grid_classi = clf_tuned
+            
             print(classification_report(y_test_bin, y_pred_classi))
             # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
         elif y_test_bin.nunique() < 2:
