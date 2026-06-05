@@ -561,7 +561,10 @@ class Model:
         except FileNotFoundError: 
             grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
         
-        best_params_reg = grid_reg.best_params_
+        try:
+            best_params_reg = grid_reg.best_params_
+        except AttributeError:
+            best_params_reg = grid_reg.estimator_
 
         y_test = np.exp(y_test) - epsilon
 
@@ -601,8 +604,11 @@ class Model:
                 y_boot_bin = pd.Series((y_boot_actual > 0).astype(int))
 
                 if grid_classi != None:
-                    best_params_classi = grid_classi.best_params_
-                    modelo_classi = RandomForestClassifier(**best_params_classi, random_state = 42)
+                    try:
+                        best_params_classi = grid_classi.best_params_
+                        modelo_classi = RandomForestClassifier(**best_params_classi, random_state = 42)
+                    except AttributeError:
+                        modelo_classi = grid_classi.estimator_
                     modelo_classi.fit(X_boot, y_boot_bin)
                     models_classi.append(modelo_classi)
 
@@ -617,8 +623,11 @@ class Model:
                 y_boot_bin = pd.Series((y_boot_actual > 0).astype(int))
 
                 if grid_classi != None:
-                    best_params_classi = grid_classi.best_params_
-                    modelo_classi = XGBClassifier(**best_params_classi, random_state = 42)
+                    try:
+                        best_params_classi = grid_classi.best_params_
+                        modelo_classi = XGBClassifier(**best_params_classi, random_state = 42)
+                    except AttributeError:
+                        modelo_classi = grid_classi.estimator_
                     modelo_classi.fit(X_boot, y_boot_bin)
                     models_classi.append(modelo_classi)
 
