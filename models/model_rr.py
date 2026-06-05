@@ -372,14 +372,23 @@ class Model:
             grid_classi.fit(X_combined, y_train_bin)
             
             best_clf = grid_classi.best_estimator_
-            clf_tuned = TunedThresholdClassifierCV(
-                estimator=best_clf,
-                scoring="roc_auc",
-                cv=5,  
-                n_jobs=-1
-            )
-            clf_tuned.fit(X_combined, y_train_bin)
-            y_pred_classi = clf_tuned.predict(X_test)
+            try:
+                clf_tuned = TunedThresholdClassifierCV(
+                    estimator=best_clf,
+                    scoring="roc_auc",
+                    cv=5,
+                    n_jobs=-1
+                )
+                clf_tuned.fit(X_combined, y_train_bin)
+                y_pred_classi = clf_tuned.predict(X_test)
+                print(f"Optimal threshold: {clf_tuned.threshold_}")
+                grid_classi = clf_tuned  
+            except ValueError as e:
+                print(f"Threshold tuning failed: {e}")
+                print("Using best classifier directly without threshold tuning.")
+                y_pred_classi = best_clf.predict(X_test)
+                grid_classi = best_clf  
+                
             print(classification_report(y_test_bin, y_pred_classi))
             # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
 
