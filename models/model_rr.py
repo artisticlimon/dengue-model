@@ -438,7 +438,8 @@ class Model:
         if mask_pos_train.sum() == 0:
             print("No positive cases in train available for regression after filtering.")
         
-        n_train_filtered = mask_pos_train[:len(X_train)].sum() 
+        n_val_filtered = mask_pos_train[:len(X_train)].sum()
+        n_train_filtered = mask_pos_train.iloc[len(X_train):].sum() 
         split_indices_1 = np.zeros(len(X_combined_1))
         split_indices_1[:n_train_filtered] = -1   
         split_indices_1[n_train_filtered:] = 0    
@@ -453,6 +454,18 @@ class Model:
                         'ccp_alpha': [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10], 
                         "criterion": ["squared_error", "absolute_error"]
             }
+
+            if n_train_filtered == 0 or n_val_filtered == 0:
+                    print(f"WARNING: No positive cases in some set (n_train={n_train_filtered}, n_val={n_val_filtered}). Using cv=5.")
+                    cv_for_reg = 5
+            else:
+                    # Create PredefinedSplit with both train and test portions
+                    split_indices_1 = np.zeros(len(X_combined_1))
+                    split_indices_1[:n_train_filtered] = -1
+                    split_indices_1[n_train_filtered:] = 0
+                    pds_1 = PredefinedSplit(test_fold=split_indices_1)
+                    pds_1 = pds_1
+                    print(f"Using PredefinedSplit: n_train={n_train_filtered}, n_val={n_val_filtered}")
 
             grid_reg = GridSearchCV(
                 estimator=reg_model, 
@@ -475,6 +488,17 @@ class Model:
                 "eval_metric": ["rmse", "mae"],
                 "reg_lambda": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10]
             }
+
+            if n_train_filtered == 0 or n_val_filtered == 0:
+                print(f"WARNING: No positive cases in some set (n_train={n_train_filtered}, n_val={n_val_filtered}). Using cv=5.")
+                pds_1 = 5
+            else:
+                # Create PredefinedSplit with both train and test portions
+                split_indices_1 = np.zeros(len(X_combined_1))
+                split_indices_1[:n_train_filtered] = -1
+                split_indices_1[n_train_filtered:] = 0
+                pds_1 = PredefinedSplit(test_fold=split_indices_1)
+                print(f"Using PredefinedSplit: n_train={n_train_filtered}, n_val={n_val_filtered}")
             
             grid_reg = GridSearchCV(
                 reg_model,
