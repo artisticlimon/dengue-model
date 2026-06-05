@@ -162,7 +162,7 @@ class Model:
             grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
         model = grid.best_estimator_
 
-        r = permutation_importance(model, X_test, y_test, n_repeats=repeats, random_state=42, scoring='neg_mean_squared_error')
+        r = permutation_importance(model, X_test, y_test, n_repeats=repeats, random_state=42, scoring='neg_mean_squared_error', n_jobs = -1)
 
         imp_df = pd.DataFrame({"Feature": X_test.columns, f"imp_{model_type}": r.importances_mean, f"std_{model_type}": r.importances_std}).sort_values(by=f"imp_{model_type}", ascending=False).reset_index(drop=True)
 
@@ -239,7 +239,7 @@ class Model:
 
         print(f"New NRMSE with selected features: {nrmse:.4f}")
         
-        importance_scores = permutation_importance(final_model, X_test[selected_features], y_test, n_repeats=repeats, random_state=42, scoring='neg_mean_squared_error').importances_mean
+        importance_scores = permutation_importance(final_model, X_test[selected_features], y_test, n_repeats=repeats, random_state=42, scoring='neg_mean_squared_error', n_jobs = -1).importances_mean
 
         df_importance = pd.DataFrame({'Feature': selected_features, 'Importance': importance_scores})
         df_importance = df_importance.sort_values(by='Importance', ascending=True)
