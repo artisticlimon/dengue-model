@@ -441,8 +441,8 @@ class Model:
         n_val_filtered = mask_pos_train[:len(X_train)].sum()
         n_train_filtered = mask_pos_train.iloc[len(X_train):].sum() 
         split_indices_1 = np.zeros(len(X_combined_1))
-        split_indices_1[:n_train_filtered] = -1   
-        split_indices_1[n_train_filtered:] = 0    
+        split_indices_1[:n_train_filtered] = 0
+        split_indices_1[n_train_filtered:] = -1   
         pds_1 = PredefinedSplit(test_fold=split_indices_1)
 
         if model_type == "hrf":
@@ -457,12 +457,11 @@ class Model:
 
             if n_train_filtered == 0 or n_val_filtered == 0:
                     print(f"WARNING: No positive cases in some set (n_train={n_train_filtered}, n_val={n_val_filtered}). Using cv=5.")
-                    cv_for_reg = 5
+                    pds_1 = 5
             else:
-                    # Create PredefinedSplit with both train and test portions
                     split_indices_1 = np.zeros(len(X_combined_1))
-                    split_indices_1[:n_train_filtered] = -1
-                    split_indices_1[n_train_filtered:] = 0
+                    split_indices_1[:n_train_filtered] = 0
+                    split_indices_1[n_train_filtered:] = -1
                     pds_1 = PredefinedSplit(test_fold=split_indices_1)
                     pds_1 = pds_1
                     print(f"Using PredefinedSplit: n_train={n_train_filtered}, n_val={n_val_filtered}")
@@ -493,10 +492,9 @@ class Model:
                 print(f"WARNING: No positive cases in some set (n_train={n_train_filtered}, n_val={n_val_filtered}). Using cv=5.")
                 pds_1 = 5
             else:
-                # Create PredefinedSplit with both train and test portions
                 split_indices_1 = np.zeros(len(X_combined_1))
-                split_indices_1[:n_train_filtered] = -1
-                split_indices_1[n_train_filtered:] = 0
+                split_indices_1[:n_train_filtered] = 0
+                split_indices_1[n_train_filtered:] = -1
                 pds_1 = PredefinedSplit(test_fold=split_indices_1)
                 print(f"Using PredefinedSplit: n_train={n_train_filtered}, n_val={n_val_filtered}")
             
