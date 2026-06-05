@@ -134,7 +134,7 @@ class Model:
 
         pds = PredefinedSplit(test_fold=split_indices)
 
-        return X_combined, y_combined, X_test, y_test, test, pds, epsilon
+        return X_combined, y_combined, X_train, X_test, y_test, test, pds, epsilon
 
     def serie_temp_canton(self, model_type, lower_bound, upper_bound):
 
@@ -160,10 +160,9 @@ class Model:
             grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except FileNotFoundError: 
             grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
-        
         model = grid.best_estimator_
 
-        r = permutation_importance(model, X_test, y_test, n_repeats=repeats, random_state=42, scoring="neg_root_mean_squared_log_error")
+        r = permutation_importance(model, X_test, y_test, n_repeats=repeats, random_state=42, scoring='neg_mean_squared_error')
 
         imp_df = pd.DataFrame({"Feature": X_test.columns, f"imp_{model_type}": r.importances_mean, f"std_{model_type}": r.importances_std}).sort_values(by=f"imp_{model_type}", ascending=False).reset_index(drop=True)
 
@@ -194,7 +193,7 @@ class Model:
             cv=pds,
             min_features_to_select=5,
             n_jobs=-1,
-            scoring="neg_root_mean_squared_log_error"
+            scoring='neg_mean_squared_error'
         )
 
         rfecv.fit(X_combined, y_combined)
@@ -240,7 +239,7 @@ class Model:
 
         print(f"New NRMSE with selected features: {nrmse:.4f}")
         
-        importance_scores = permutation_importance(final_model, X_test[selected_features], y_test, n_repeats=repeats, random_state=42, scoring="neg_root_mean_squared_log_error").importances_mean
+        importance_scores = permutation_importance(final_model, X_test[selected_features], y_test, n_repeats=repeats, random_state=42, scoring='neg_mean_squared_error').importances_mean
 
         df_importance = pd.DataFrame({'Feature': selected_features, 'Importance': importance_scores})
         df_importance = df_importance.sort_values(by='Importance', ascending=True)
@@ -346,7 +345,7 @@ class Model:
 
         print(f"XGB Model Ready for {self.canton}")
 
-    def hybrid(self, model_type, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
+    def hybrid(self, model_type, X_combined, y_combined, X_train, X_test, y_test, test, pds, epsilon):
 
         X_combined = X_combined.reset_index(drop=True)
         X_test = X_test.reset_index(drop=True)
@@ -363,14 +362,14 @@ class Model:
 
         if model_type == "hrf" and y_test_bin.nunique() >= 2:
             clf = RandomForestClassifier(oob_score=True, random_state=42)
-            clf.tuned = TunedThresholdClassifierCV(estimator = clf, cv = 5)
+            clf.tuned = TunedThresholdClassifierCV(estimator = clf, cv = pds, scoring = "roc_auc", n_jobs=-1)
             param_grid = {
                 "estimator__max_depth": [3, 5, 7, 9],
                 "estimator__min_samples_split": [10, 50, 75, 100, 150],
                 "estimator__ccp_alpha": [0, 1 /  10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
                 "estimator__criterion": ["gini", "entropy"],
             } 
-            grid_classi = GridSearchCV(clf.tuned, param_grid, cv=pds, n_jobs=-1, verbose=10)
+            grid_classi = GridSearchCV(clf.tuned, param_grid, cv=pds, n_jobs=-1, verbose=0)
             grid_classi.fit(X_combined, y_train_bin)
             y_pred_classi = grid_classi.predict(X_test)
             print(classification_report(y_test_bin, y_pred_classi))
@@ -378,7 +377,7 @@ class Model:
 
         elif model_type == "hxgb" and y_test_bin.nunique() >= 2:
             clf = XGBClassifier(random_state=42)
-            clf.tuned = TunedThresholdClassifierCV(estimator = clf, scoring = "roc_auc", cv = 5)
+            clf.tuned = TunedThresholdClassifierCV(estimator = clf, scoring = "roc_auc", cv = pds, n_jobs = -1)
             param_grid = {
                 "estimator__max_depth": [3, 5, 7, 9],
                 "estimator__learning_rate": [0.1, 0.3, 0.05, 0.01],
@@ -386,7 +385,7 @@ class Model:
                 "estimator__reg_lambda": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
                 "estimator__eval_metric": ["merror", "mlogloss"]
             }
-            grid_classi = GridSearchCV(clf.tuned, param_grid, cv=5, n_jobs=-1, verbose=0)
+            grid_classi = GridSearchCV(clf.tuned, param_grid, cv=pds, n_jobs=-1, verbose=0)
             grid_classi.fit(X_combined, y_train_bin)
             y_pred_classi = grid_classi.predict(X_test)
             print(classification_report(y_test_bin, y_pred_classi))
@@ -401,11 +400,15 @@ class Model:
         mask_pos_train = y_combined_actual > 0 
         X_combined_1 = X_combined.loc[mask_pos_train].reset_index(drop=True)
         y_combined_1 = y_combined.loc[mask_pos_train].reset_index(drop=True)
+
         if mask_pos_train.sum() == 0:
             print("No positive cases in train available for regression after filtering.")
         
-        filtered_test_fold = pds.test_fold[mask_pos_train.values]
-        pds_1 = PredefinedSplit(filtered_test_fold)
+        n_train_filtered = mask_pos_train[:len(X_train)].sum() 
+        split_indices_1 = np.zeros(len(X_combined_1))
+        split_indices_1[:n_train_filtered] = -1   
+        split_indices_1[n_train_filtered:] = 0    
+        pds_1 = PredefinedSplit(test_fold=split_indices_1)
 
         if model_type == "hrf":
             reg_model = RandomForestRegressor(oob_score=True, random_state=42)
@@ -471,7 +474,7 @@ class Model:
 
         joblib.dump(grid_reg, f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
 
-        # print(f"{model_type} ready for {self.canton}")
+        print(f"{model_type} ready for {self.canton}")
 
     def ticks_years_top(self, ax, n):
         [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n != 0]
@@ -490,7 +493,7 @@ class Model:
 
         return self.canton, nrmse
 
-    def confint_nrmse(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, n_bootstraps = 500):
+    def confint_nrmse(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, n_bootstraps = 100):
 
         try:
             grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
