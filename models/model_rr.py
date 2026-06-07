@@ -1,3 +1,7 @@
+"""
+This script contains the Model class used to train and evaluate the different models for relative risk. It includes methods for partitioning the data, training the models, calculating variable importance, selecting features with RFECV, calculating prediction intervals, and calculating confidence intervals for the NRMSE metric. The class is designed to be flexible and can be used for different cantons and model types (Random Forest, XGBoost, Hybrid Random Forest, Hybrid XGBoost).
+"""
+
 import pandas as pd
 from sklearn.metrics import classification_report, mean_absolute_error, root_mean_squared_error
 import matplotlib.pyplot as plt
@@ -10,14 +14,40 @@ from xgboost import XGBRegressor
 from sklearn.inspection import permutation_importance
 from sklearn.feature_selection import RFECV
 from arch.bootstrap import CircularBlockBootstrap
-from mapie.regression import CrossConformalRegressor
+from mapie.regression import TimeSeriesRegressor
+from mapie.subsample import BlockBootstrap
 from sklearn.base import clone
 
 
 class Model:
+
+    """
+    Attributes:
+    ----
+    df: dataframe
+        complete dataset with, including lags and target variable, with each row being a week-canton pair
+    canton: str
+        the canton for which we want to train and evaluate the model. 
+    """
+
     def __init__(self, df, canton):
+    
+        """
+        Method that initializes the class, filters for the desired canton, and drops the columns that are not needed for the models because they correspond to that same week. 
+
+        Parameters
+        ----
+        df: dataframe
+            complete dataset with, including lags and target variable, with each row being a week-canton pair
+        canton: str
+            the canton for which we want to train and evaluate the model.
+        Returns
+        ----
+            Nothing, but initializes the class with the filtered and cleaned dataframe for the desired canton.
+        """
+    
         self.canton = canton
-        self.df = df[df["week_canton"].str.contains(canton)]
+        self.df = df[df["week_canton"].str.contains(canton)] # Filter for the desired canton
         self.df.drop(columns = ["tmax_mean"], inplace = True)
         self.df.drop(columns = ["tmin_mean"], inplace = True)
         self.df.drop(columns = ["temp_prom"], inplace = True)
@@ -44,6 +74,23 @@ class Model:
         self.df.drop(columns = ["dengue"], inplace = True)
 
     def drop_lags(self, i, f, df_temp):
+
+        """
+        Method that drops the lag columns that are not needed for the models, depending on which time frame we want to use to make predictions (usual options include immediate, medium term, all lags).
+
+        Parameters
+        ----
+        i: int
+            initial month of lags to drop (e.g., if we want to keep lags 1-4, i would be 5)
+        f: str
+            last month of lags to drop (e.g., if we want to keep lags 1-4, f would be 9)
+        df_temp: dataframe
+            dataframe from which to drop the lag columns
+        Returns
+        ----
+            df_temp: dataframe with the specified lag columns dropped
+        """
+
         for i in range(i, f):
             df_temp.drop(columns = [f"tmax_mean_lag_{i}"], inplace = True)
             df_temp.drop(columns = [f"tmin_mean_lag_{i}"], inplace = True)
@@ -72,7 +119,31 @@ class Model:
             df_temp.drop(columns = [f"dengue_lag_{i}"], inplace = True)
         return df_temp
 
-    def partition(self):
+    def partition(self, epsilon = 0.2):
+
+        """
+        Method that created that partitions the dataset into train, validation, and test sets for relative risk as a target value. It drops other target values and relative risk lags. It adds a small value (epsilon) to the relative risk before log-transforming it, to avoid issues with zero values. Finally, it also creates a predefined split object to be used for both hyperparameter tuning and RFECV, specifying which data points belong to train and which to validation.
+
+        Returns
+        ----
+            X_combined: dataframe
+                dataframe with the features for the train and validation set
+            y_combined: pandas Series
+                pandas Series with the target variable (relative risk) for the train and validation set, log-transformed and with epsilon added
+            X_train: dataframe
+                dataframe with the features for the train set. It is returned separately from X_combined to be used to create the new predefined splits for the regression part of the hybrid model.
+            X_test: dataframe
+                dataframe with the features for the test set
+            y_test: pandas Series
+                pandas Series with the target variable (relative risk) for the test set, log-transformed and with epsilon added
+            test: dataframe
+                dataframe with the test set, including the week_canton column for plotting purposes
+            pds: predefined split
+                the predefined split object that specifies which data points belong to train and which to validation, to be used for both hyperparameter tuning and RFECV.
+            epsilon: int
+                the small value that was added to the relative risk before log-transforming it, to avoid issues with zero values. The default value was found through trial and error, looking at histograms for each value.
+        """
+
         df_temp = self.df.copy()
 
         df_temp.drop(columns=['clasi_rr'], inplace=True)
@@ -80,6 +151,7 @@ class Model:
         df_temp.drop(columns = ["clasi_rr_no_0"], inplace = True)
 
         df_temp = self.drop_lags(i = 5, f = 9, df_temp = df_temp)
+
         for i in range(5, 9):
             df_temp.drop(columns = [f"rr_lag_{i}"], inplace = True)
 
@@ -110,11 +182,10 @@ class Model:
 
         df_temp = pd.get_dummies(df_temp, columns = ["urb"])
 
+        # 2020-2023 as train, 2024 as validation, 2025 as test  
         train = df_temp[df_temp['week_canton'] < '2024-1-101']
         val = df_temp[(df_temp['week_canton'] >= '2024-1-101') & (df_temp['week_canton'] < '2025-1-101')]
-        test = df_temp[df_temp['week_canton'] >= '2025-1-101']
-
-        epsilon = 0.2 # This epsilon was found through trial and error, looking at histograms for each value
+        test = df_temp[df_temp['week_canton'] >= '2025-1-101'] 
 
         X_train = train.drop(columns = ["rr", "week_canton"]).reset_index(drop=True)
         y_train = np.log(train["rr"] + epsilon).reset_index(drop=True)
@@ -132,11 +203,27 @@ class Model:
         split_indices[:len(X_train)] = -1
         split_indices[len(X_train):] = 0
 
-        pds = PredefinedSplit(test_fold=split_indices)
+        pds = PredefinedSplit(test_fold=split_indices) # Create predefined split to be used for both hyperparameter tuning and RFECV, specifying which data points belong to train and which to validation
 
         return X_combined, y_combined, X_train, X_test, y_test, test, pds, epsilon
 
-    def serie_temp_canton(self, model_type, lower_bound, upper_bound):
+    def serie_temp_canton(self, model_type, y_pred_point, lower_bound, upper_bound):
+
+        """
+        Method that plots the time series of actual and predicted relative risk values for the test set, including the confidence intervals for the predictions. It reads the results from the csv file where they were saved after making predictions with the trained model.
+
+        Parameters
+        ----
+        model_type: str
+            the type of model for which to plot the results (options: "rf", "xgb", "hrf", "hxgb")
+        lower_bound: array-like
+            array-like with the lower bound of the confidence intervals for the predictions, to be used as the lower limit shaded area around the predicted values in the plot.
+        upper_bound: array-like
+            array-like with the upper bound of the confidence intervals for the predictions, to be used as the upper limit shaded area around the predicted values in the plot.
+        Returns
+        ----
+            Nothing, just shows the plot with the time series of actual and predicted relative risk values for the test set, including the confidence intervals for the predictions.
+        """
 
         results = pd.read_csv(f'../../data/model_results/results_{model_type}_{self.canton}.csv')
         
@@ -144,7 +231,8 @@ class Model:
 
         fig, ax = plt.subplots()
         ax.plot(results['week_canton'], results["actual"], label='Real', marker='o', linestyle = "dashed", color = "blue")
-        ax.plot(results['week_canton'], results["pred"], label='Predicted', marker='o', color = "green")
+        ax.plot(results['week_canton'], results["pred"], label='Predicted', marker='o', color = "red")
+        ax.plot(results['week_canton'], y_pred_point, label='Conformal predictions', marker='o', color = "green")
         ax.fill_between(x = results['week_canton'], label = "CI (95%)", y1 = lower_bound, y2 = upper_bound, alpha = 0.2, color = "green")
         ax.legend(loc = "upper right")
         self.ticks_years_top(ax, 20)
@@ -156,6 +244,29 @@ class Model:
     
     def var_importance(self, X_test, y_test, model_type, repeats, var = "RR"):
 
+        """
+        Method that calculates and plots the permutation importance of the features for the specified model type, using the test set. It reads the trained model from the saved models folder, calculates the permutation importance using the sklearn function, and then creates a horizontal bar plot with the importance scores for the top 10 features.
+
+        Parameters
+        ----
+        X_test: dataframe
+            dataframe with the features for the test set
+        y_test: pandas Series
+            pandas Series with the target variable (relative risk) for the test set, log-transformed and with epsilon added
+        model_type: str
+            the type of model for which to calculate the variable importance (options: "rf", "xgb", "hrf", "hxgb")
+        repeats: int
+            the number of times to permute a feature for calculating the permutation importance, to be used as the n_repeats parameter in the sklearn function. 
+        var: str
+            the name of the target variable for which to calculate the variable importance, to be used in the title of the plot. the default value is "RR" for relative risk.
+
+        Returns
+        ----
+            imp_df: dataframe
+                dataframe with the features, their importance scores, and their standard deviation, sorted by importance score in descending order.
+        """
+
+        # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
         try:
             grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except FileNotFoundError: 
@@ -180,6 +291,40 @@ class Model:
 
     def rfecv_selection(self, model_type, X_combined, y_combined, X_test, y_test, pds, repeats, var = "RR"):
 
+        """
+        Method that performs Recursive Feature Elimination with Cross-Validation (RFECV) to select the most important features for the specified model type, using the combined train and validation set. It reads the trained model from the saved models folder, performs RFECV to select the optimal number of features, and then fits a new model with only the selected features. Finally, it calculates the NRMSE for the test set using the new model and plots the feature importance for the selected features.
+
+        Parameters
+        ----
+        model_type: str 
+            the type of model for which to perform RFECV and feature selection (options: "rf", "xgb", "hrf", "hxgb")
+
+        X_combined: dataframe
+            dataframe with the features for the combined train and validation set
+
+        y_combined: pandas Series
+            pandas Series with the target variable (relative risk) for the combined train and validation set, log-transformed and with epsilon added
+        
+        X_test: dataframe
+            dataframe with the features for the test set 
+        
+        y_test: pandas Series
+            pandas Series with the target variable (relative risk) for the test set, log-transformed and with epsilon added
+
+        pds: PredefinedSplit
+            the predefined split object that specifies which data points belong to train and which to validation, to be used for RFECV.
+        
+        repeats: int
+            the number of times to permute a feature for calculating the permutation importance, to be used as the n_repeats parameter in the sklearn function permutation_importance when calculating the feature importance for the selected features after performing RFECV.
+        var: str
+            the name of the target variable for which to perform RFECV and feature selection, to be used in the title of the plots. the default value is "RR" for relative risk.
+
+        Returns
+        ----
+            Nothing, but it prints the optimal number of features selected by RFECV, the names of the selected features, and the new NRMSE for the test set using only the selected features. It also shows a plot with the RFECV score vs number of features, including a vertical line indicating the optimal number of features, and a horizontal bar plot with the feature importance for the selected features.
+        """
+
+        # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
         try:
             grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except FileNotFoundError: 
@@ -198,30 +343,31 @@ class Model:
 
         rfecv.fit(X_combined, y_combined)
 
-        selected_mask = rfecv.support_
+        selected_mask = rfecv.support_ # boolean mask of selected features
         selected_features = X_combined.columns[selected_mask].tolist()
 
         print(f'Optimal number of features for {var} and {model_type}: {rfecv.n_features_}')
         print(f'Selected features: {selected_features}')
 
+        # The cv_results_ dictionary may not always include the "n_features" key, depending on the version of sklearn and the specific estimator used. If it is not present, we can create a range of feature numbers based on the minimum number of features to select and the length of the mean_test_score array. This is used for plotting the RFECV score vs number of features, as the x-axis needs to represent the number of features selected at each step of the RFECV process.
         if "n_features" in rfecv.cv_results_:
             n_features_range = rfecv.cv_results_["n_features"]
         else:
             n_features_range = range(
                 rfecv.min_features_to_select,
-                rfecv.min_features_to_select + len(rfecv.cv_results_["mean_test_score"])
+                rfecv.min_features_to_select + len(rfecv.cv_results_["mean_test_score"]) # This is used because the number of features is the minimum + the number of steps taken after the minimum features to select up until the total features
             )
 
         fig, ax = plt.subplots(figsize=(9, 4))
         ax.plot(n_features_range, rfecv.cv_results_['mean_test_score'], linewidth=2, marker='o', markersize=4)
-        ax.fill_between(
+        ax.fill_between( # Create shaded area for the standard deviation around the mean test score, to visualize the variability of the scores across the different folds of the cross-validation for each number of features selected.
             n_features_range,
             rfecv.cv_results_['mean_test_score'] - rfecv.cv_results_['std_test_score'],
             rfecv.cv_results_['mean_test_score'] + rfecv.cv_results_['std_test_score'],
             alpha=0.2
         )
         ax.axvline(rfecv.n_features_, linestyle='--', linewidth=2,
-                label=f'Optimal: {rfecv.n_features_} features')
+                label=f'Optimal: {rfecv.n_features_} features') # Add vertical line to indicate the optimal number of features selected by RFECV, with a label showing the number of features.
         ax.set_title(f'RFECV score vs Number of Features {var} and {model_type}', pad=10)
         ax.set_xlabel('Number of Features Selected')
         ax.set_ylabel('Cross-Validated score')
@@ -229,7 +375,7 @@ class Model:
         plt.tight_layout()
         plt.show()
 
-        final_model = clone(model)
+        final_model = clone(model) # Clone the original model to create a new model that we will fit with only the selected features, to avoid modifying the original model that was trained with all features. 
         final_model.fit(X_combined[selected_features], y_combined)
 
         final_model_pred = final_model.predict(X_test[selected_features])
@@ -249,8 +395,44 @@ class Model:
         plt.title(f"Feature Importance Selected by RFECV for {model_type} model of {var}")
         plt.show()
 
-    def prediction_intervals(self, X_combined, y_combined, X_test, epsilon, model_type, pds):
+    def prediction_intervals(self, X_combined, y_combined, X_test, epsilon, model_type, repeats):
 
+        """
+        Method that calculates the prediction intervals for the specified model type using the MAPIE library, which implements conformal prediction methods. It reads the trained model from the saved models folder, fits a CrossConformalRegressor with the best estimator from the grid search, and then predicts the point estimates and prediction intervals for the test set. Finally, it exponentiates the predictions and intervals to transform them back to the original scale of relative risk, and returns the point predictions (the mean) along with the lower and upper bounds of the prediction intervals.
+
+        Parameters
+        ----
+        X_combined: dataframe
+            dataframe with the features for the combined train and validation set
+        
+        y_combined: pandas Series
+            pandas Series with the target variable (relative risk) for the combined train and validation set, log-transformed and with epsilon added
+        
+        X_test: dataframe
+            dataframe with the features for the test set
+        
+        epsilon: float
+            the small value that was added to the relative risk before log-transforming it, to avoid issues with zero values. This value is subtracted from the predictions and intervals after exponentiating them, to transform them back to the original scale of relative risk.
+        
+        model_type: str
+            the type of model for which to calculate the prediction intervals (options: "rf", "xgb", "hrf", "hxgb")
+        
+        pds: PredefinedSplit
+            the predefined split object that specifies which data points belong to train and which to validation, to be used for fitting the CrossConformalRegressor.
+
+        Returns
+        ----
+            y_pred_point: numpy.ndarray
+                array-like with the point predictions (the mean) for the test set, exponentiated and with epsilon subtracted to transform them back to the original scale of relative risk.
+
+            lower_bound: numpy.ndarray
+                array-like with the lower bound of the prediction intervals for the test set, exponentiated and with epsilon subtracted to transform them back to the original scale of relative risk. 
+            
+            upper_bound: numpy.ndarray
+                array-like with the upper bound of the prediction intervals for the test set, exponentiated and with epsilon subtracted to transform them back to the original scale of relative risk.
+        """
+
+        # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
         try:
             grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except: 
@@ -258,24 +440,43 @@ class Model:
 
         best_rf = grid.best_estimator_
 
-        mapie_reg = CrossConformalRegressor(
-             estimator=best_rf,
-             confidence_level=0.95,
-             cv = pds
-         )
+        cv_mapiets = BlockBootstrap(
+            n_resamplings=repeats, length = 12, overlapping=True, random_state=42
+        )
 
-        mapie_reg.fit_conformalize(X_combined, y_combined)
+        mapie_reg = TimeSeriesRegressor(
+            best_rf, method="enbpi", cv=cv_mapiets, agg_function="mean", n_jobs=-1, random_state = 42
+        )
 
-        y_pred_rf_cp, y_interval = mapie_reg.predict_interval(X_test)
+        mapie_reg.fit(X_combined, y_combined)
+
+        y_pred_cp, y_interval = mapie_reg.predict(X_test, ensemble = True, confidence_level = 0.95)
 
         lower_bound = np.exp(y_interval[:, 0, 0]) - epsilon
         upper_bound = np.exp(y_interval[:, 1, 0]) - epsilon
 
-        y_pred_point = np.exp(y_pred_rf_cp) - epsilon
+        y_pred_point = np.exp(y_pred_cp) - epsilon
 
         return y_pred_point, lower_bound, upper_bound
 
     def rf_reg(self, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
+
+        """
+        Method that 
+
+        Parameters
+        ----
+        df_small: dataframe
+            dataframe with data that needs to be interpolated
+
+        first_day, last_day: Date
+            First and last day of the period in which to interpolate
+
+        Returns
+        ----
+            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+        """
+
         rf = RandomForestRegressor(oob_score=True, random_state=42)
 
         param_grid_rf = {
@@ -310,6 +511,22 @@ class Model:
         print(f"RF Model Ready for {self.canton}")
 
     def xgb_reg(self, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
+
+        """
+        Method that 
+
+        Parameters
+        ----
+        df_small: dataframe
+            dataframe with data that needs to be interpolated
+
+        first_day, last_day: Date
+            First and last day of the period in which to interpolate
+
+        Returns
+        ----
+            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+        """
 
         xgb = XGBRegressor(random_state=42)
 
@@ -346,6 +563,22 @@ class Model:
         print(f"XGB Model Ready for {self.canton}")
 
     def hybrid(self, model_type, X_combined, y_combined, X_train, X_test, y_test, test, pds, epsilon):
+
+        """
+        Method that 
+
+        Parameters
+        ----
+        df_small: dataframe
+            dataframe with data that needs to be interpolated
+
+        first_day, last_day: Date
+            First and last day of the period in which to interpolate
+
+        Returns
+        ----
+            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+        """
 
         X_combined = X_combined.reset_index(drop=True)
         X_test = X_test.reset_index(drop=True)
@@ -533,6 +766,23 @@ class Model:
         print(f"{model_type} ready for {self.canton}")
 
     def ticks_years_top(self, ax, n):
+
+        """
+        Method that 
+
+        Parameters
+        ----
+        df_small: dataframe
+            dataframe with data that needs to be interpolated
+
+        first_day, last_day: Date
+            First and last day of the period in which to interpolate
+
+        Returns
+        ----
+            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+        """
+
         [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n != 0]
         for i, tick in enumerate(ax.xaxis.get_major_ticks()):
             if i % n != 0:
@@ -541,6 +791,23 @@ class Model:
                 tick.gridline.set_visible(False) 
 
     def calculate_nrmse(self, model_type):
+
+        """
+        Method that 
+
+        Parameters
+        ----
+        df_small: dataframe
+            dataframe with data that needs to be interpolated
+
+        first_day, last_day: Date
+            First and last day of the period in which to interpolate
+
+        Returns
+        ----
+            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+        """
+                
         results = pd.read_csv(f'../../data/model_results/results_{model_type}_{self.canton}.csv')
 
         rmse = root_mean_squared_error(results["actual"], results["pred"])
@@ -550,6 +817,22 @@ class Model:
         return self.canton, nrmse
 
     def confint_nrmse(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, n_bootstraps = 100):
+
+        """
+        Method that 
+
+        Parameters
+        ----
+        df_small: dataframe
+            dataframe with data that needs to be interpolated
+
+        first_day, last_day: Date
+            First and last day of the period in which to interpolate
+
+        Returns
+        ----
+            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+        """
 
         try:
             grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
@@ -657,5 +940,3 @@ class Model:
 
         print(f"point estimate: {round(y_pred_point, 2)}")
         print(f"lower bound: {round(lower_bound, 2)}, upper bound: {round(upper_bound, 2)}")
-
-    
