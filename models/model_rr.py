@@ -316,6 +316,7 @@ class Model:
         
         repeats: int
             the number of times to permute a feature for calculating the permutation importance, to be used as the n_repeats parameter in the sklearn function permutation_importance when calculating the feature importance for the selected features after performing RFECV.
+
         var: str
             the name of the target variable for which to perform RFECV and feature selection, to be used in the title of the plots. the default value is "RR" for relative risk.
 
@@ -417,8 +418,8 @@ class Model:
         model_type: str
             the type of model for which to calculate the prediction intervals (options: "rf", "xgb", "hrf", "hxgb")
         
-        pds: PredefinedSplit
-            the predefined split object that specifies which data points belong to train and which to validation, to be used for fitting the CrossConformalRegressor.
+        repeats: int
+            how many bootstrap resamplings will be conducted
 
         Returns
         ----
@@ -462,19 +463,34 @@ class Model:
     def rf_reg(self, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
 
         """
-        Method that 
+        Method that trains a random forest model for the class instance, performing a grid search to tune hyperparameters. It also saves the resulting predictions and the trained model in a separate folder.
 
         Parameters
         ----
-        df_small: dataframe
-            dataframe with data that needs to be interpolated
+        X_combined: dataframe
+            dataframe with the features for the combined train and validation set
 
-        first_day, last_day: Date
-            First and last day of the period in which to interpolate
+        y_combined: pandas Series
+            pandas Series with the target variable (relative risk) for the combined train and validation set, log-transformed and with epsilon added
+        
+        X_test: dataframe
+            dataframe with the features for the test set 
+        
+        y_test: pandas Series
+            pandas Series with the target variable (relative risk) for the test set, log-transformed and with epsilon added
+
+        test: dataframe
+            dataframe with the test set, including the week_canton column for so that it can be used to save the results linked to a week.
+        
+        pds: predefined split
+            the predefined split object that specifies which data points belong to train and which to validation, to be used for both hyperparameter tuning.
+        
+        epsilon: int
+            the small value that was added to the relative risk before log-transforming it, to avoid issues with zero values. The default value was found through trial and error, looking at histograms for each value. 
 
         Returns
         ----
-            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+            Nothing, but it saves the model results and the trained model, and prints when it is ready.
         """
 
         rf = RandomForestRegressor(oob_score=True, random_state=42)
@@ -513,19 +529,34 @@ class Model:
     def xgb_reg(self, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
 
         """
-        Method that 
+        Method that trains a XGBoost model for the class instance, performing a grid search to tune hyperparameters. It also saves the resulting predictions and the trained model in a separate folder.
 
         Parameters
         ----
-        df_small: dataframe
-            dataframe with data that needs to be interpolated
+        X_combined: dataframe
+            dataframe with the features for the combined train and validation set
 
-        first_day, last_day: Date
-            First and last day of the period in which to interpolate
+        y_combined: pandas Series
+            pandas Series with the target variable (relative risk) for the combined train and validation set, log-transformed and with epsilon added
+        
+        X_test: dataframe
+            dataframe with the features for the test set 
+        
+        y_test: pandas Series
+            pandas Series with the target variable (relative risk) for the test set, log-transformed and with epsilon added
+
+        test: dataframe
+            dataframe with the test set, including the week_canton column for so that it can be used to save the results linked to a week.
+        
+        pds: predefined split
+            the predefined split object that specifies which data points belong to train and which to validation, to be used for both hyperparameter tuning.
+        
+        epsilon: int
+            the small value that was added to the relative risk before log-transforming it, to avoid issues with zero values. The default value was found through trial and error, looking at histograms for each value. 
 
         Returns
         ----
-            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+            Nothing, but it saves the model results and the trained model, and prints when it is ready.
         """
 
         xgb = XGBRegressor(random_state=42)
@@ -565,19 +596,40 @@ class Model:
     def hybrid(self, model_type, X_combined, y_combined, X_train, X_test, y_test, test, pds, epsilon):
 
         """
-        Method that 
+        Method that trains a hybrid model (Random Forest-Random Forest or XGBoost-XGBoost) for the class instance, performing a grid search to tune hyperparameters. It also saves the resulting predictions and the trained model in a separate folder.
 
         Parameters
         ----
-        df_small: dataframe
-            dataframe with data that needs to be interpolated
+        model_type: str
+            this indicates which of the hybrid models are desired ("hrf" for Random Forest Hybrid and "hxgb" for XGBoost hybrid)
 
-        first_day, last_day: Date
-            First and last day of the period in which to interpolate
+        X_combined: dataframe
+            dataframe with the features for the combined train and validation set
+
+        y_combined: pandas Series
+            pandas Series with the target variable (relative risk) for the combined train and validation set, log-transformed and with epsilon added
+        
+        X_train: dataframe
+            dataframe with the features for the train set, to be used when defining the second validation predefined split for the regression model
+            
+        X_test: dataframe
+            dataframe with the features for the test set 
+        
+        y_test: pandas Series
+            pandas Series with the target variable (relative risk) for the test set, log-transformed and with epsilon added
+
+        test: dataframe
+            dataframe with the test set, including the week_canton column for so that it can be used to save the results linked to a week.
+        
+        pds: predefined split
+            the predefined split object that specifies which data points belong to train and which to validation, to be used for both hyperparameter tuning.
+        
+        epsilon: int
+            the small value that was added to the relative risk before log-transforming it, to avoid issues with zero values. The default value was found through trial and error, looking at histograms for each value. 
 
         Returns
         ----
-            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+            Nothing, but it saves the model results and the trained model, and prints when it is ready.
         """
 
         X_combined = X_combined.reset_index(drop=True)
@@ -588,12 +640,12 @@ class Model:
 
         y_combined_actual = np.exp(y_combined) - epsilon
         y_test_actual = np.exp(y_test) - epsilon 
-        y_train_bin = pd.Series((y_combined_actual > 0).astype(int)).reset_index(drop=True) 
-        y_test_bin = pd.Series((y_test_actual > 0).astype(int)).reset_index(drop=True) 
-        if y_test_bin.nunique() < 2:
-            print(f"WARNING: Test set only contains one label: {y_test_bin.unique()[0]}")
+        y_train_binary = pd.Series((y_combined_actual > 0).astype(int)).reset_index(drop=True) 
+        y_test_binary = pd.Series((y_test_actual > 0).astype(int)).reset_index(drop=True) 
+        if y_test_binary.nunique() < 2:
+            print(f"WARNING: Test set only contains one label: {y_test_binary.unique()[0]}")
 
-        if model_type == "hrf" and y_test_bin.nunique() >= 2:
+        if model_type == "hrf" and y_test_binary.nunique() >= 2:
             clf = RandomForestClassifier(oob_score=True, random_state=42)
             param_grid = {
                 "max_depth": [3, 5, 7, 9],
@@ -602,9 +654,11 @@ class Model:
                 "criterion": ["gini", "entropy"]
             }
             grid_classi = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, verbose=0, scoring="roc_auc")
-            grid_classi.fit(X_combined, y_train_bin)
+            grid_classi.fit(X_combined, y_train_binary)
             
             best_clf = grid_classi.best_estimator_
+
+            # There were some issues with constant classifier predictions happening because of the low quantity of data. If this happens, threshold tuning is skipped.
             try:
                 clf_tuned = TunedThresholdClassifierCV(
                     estimator=best_clf,
@@ -613,7 +667,7 @@ class Model:
                     n_jobs=-1,
                     random_state=42
                 )
-                clf_tuned.fit(X_combined, y_train_bin)
+                clf_tuned.fit(X_combined, y_train_binary)
                 y_pred_classi = clf_tuned.predict(X_test)
                 grid_classi = clf_tuned  
             except ValueError as e:
@@ -622,10 +676,9 @@ class Model:
                 y_pred_classi = best_clf.predict(X_test)
                 grid_classi = best_clf  
 
-            print(classification_report(y_test_bin, y_pred_classi))
-            # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
+            print(classification_report(y_test_binary, y_pred_classi))
 
-        elif model_type == "hxgb" and y_test_bin.nunique() >= 2:
+        elif model_type == "hxgb" and y_test_binary.nunique() >= 2:
             clf = XGBClassifier(random_state=42)
             param_grid = {
                 "max_depth": [3, 5, 7, 9],
@@ -635,9 +688,10 @@ class Model:
                 "eval_metric": ["logloss"]
             }
             grid_classi = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, scoring="roc_auc")
-            grid_classi.fit(X_combined, y_train_bin)
+            grid_classi.fit(X_combined, y_train_binary)
             best_clf = grid_classi.best_estimator_
 
+            # There were some issues with constant classifier predictions happening because of the low quantity of data. If this happens, threshold tuning is skipped.
             try:
                 clf_tuned = TunedThresholdClassifierCV(
                     estimator=best_clf,
@@ -646,7 +700,7 @@ class Model:
                     n_jobs=-1,
                     random_state=42
                 )
-                clf_tuned.fit(X_combined, y_train_bin)
+                clf_tuned.fit(X_combined, y_train_binary)
                 y_pred_classi = clf_tuned.predict(X_test)
                 grid_classi = clf_tuned  
             except ValueError as e:
@@ -655,12 +709,12 @@ class Model:
                 y_pred_classi = best_clf.predict(X_test)
                 grid_classi = best_clf  
             
-            print(classification_report(y_test_bin, y_pred_classi))
+            print(classification_report(y_test_binary, y_pred_classi))
             # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
-        elif y_test_bin.nunique() < 2:
+        elif y_test_binary.nunique() < 2:
             print("Only one class present in test set for classification. Skipping classification step.")
             grid_classi = None
-            y_pred_classi = np.repeat(y_test_bin.unique(), len(y_test_bin))  
+            y_pred_classi = np.repeat(y_test_binary.unique(), len(y_test_binary))  
         else:
             print("Invalid classification model")
 
@@ -668,9 +722,11 @@ class Model:
         X_combined_1 = X_combined.loc[mask_pos_train].reset_index(drop=True)
         y_combined_1 = y_combined.loc[mask_pos_train].reset_index(drop=True)
 
+        # If all cases are 0, skip
         if mask_pos_train.sum() == 0:
             print("No positive cases in train available for regression after filtering.")
         
+        # Create predefined split to differentiate between train and validation points when the model is being tuned
         n_val_filtered = mask_pos_train[:len(X_train)].sum()
         n_train_filtered = mask_pos_train.iloc[len(X_train):].sum() 
         split_indices_1 = np.zeros(len(X_combined_1))
@@ -758,6 +814,7 @@ class Model:
 
         results.to_csv(f"../../data/model_results/results_{model_type}_{self.canton}.csv", index=False)
 
+        # Only save classification model if the classification step was not skipped due to only one class being present in test set
         if grid_classi != None:
             joblib.dump(grid_classi, f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
 
@@ -768,19 +825,19 @@ class Model:
     def ticks_years_top(self, ax, n):
 
         """
-        Method that 
+        Method that adjusts plot ticks in the time series plot so that it looks more organized. 
 
         Parameters
         ----
-        df_small: dataframe
-            dataframe with data that needs to be interpolated
+        ax: Axes
+            canvas were the data will be plotted
 
-        first_day, last_day: Date
-            First and last day of the period in which to interpolate
+        n: int
+            show every n-th tick
 
         Returns
         ----
-            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+            Nothing, but adds neat ticks to the plot
         """
 
         [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n != 0]
@@ -793,19 +850,20 @@ class Model:
     def calculate_nrmse(self, model_type):
 
         """
-        Method that 
+        Method that calculates the NRMSE for the predictions from a model of a certain type, using the class instance canton.
 
         Parameters
         ----
-        df_small: dataframe
-            dataframe with data that needs to be interpolated
-
-        first_day, last_day: Date
-            First and last day of the period in which to interpolate
+        model_type: str
+            model for which the NRMSE will be calculated (options: "rf", "xgb", "hrf", "hxgb")
 
         Returns
         ----
-            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+            self.canton: str
+                the canton included in the class instance
+
+            nrmse: float
+                the calculated NRMSE
         """
                 
         results = pd.read_csv(f'../../data/model_results/results_{model_type}_{self.canton}.csv')
@@ -819,35 +877,49 @@ class Model:
     def confint_nrmse(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, n_bootstraps = 100):
 
         """
-        Method that 
+        Method that calculates the confidence intervals for the NRMSE using Circular Block Bootstrap  
 
         Parameters
         ----
-        df_small: dataframe
-            dataframe with data that needs to be interpolated
+        model_type: str
+            the type of model for which to calculate the confidence intervals (options: "rf", "xgb", "hrf", "hxgb")
 
-        first_day, last_day: Date
-            First and last day of the period in which to interpolate
+        X_combined: dataframe
+            dataframe with the features for the combined train and validation set
+        
+        y_combined: pandas Series
+            pandas Series with the target variable (relative risk) for the combined train and validation set, log-transformed and with epsilon added
+        
+        X_test: dataframe
+            dataframe with the features for the test set
+        
+        y_test: pandas Series
+            pandas Series with the target variable (relative risk) for the test set, log-transformed and with epsilon added
+        
+        epsilon: float
+            the small value that was added to the relative risk before log-transforming it, to avoid issues with zero values. This value is subtracted from the predictions and intervals after exponentiating them, to transform them back to the original scale of relative risk.
+        
+        n_bootstraps: int
+            how many bootstrap resamplings will be conducted
 
         Returns
         ----
-            df_filter_weeks: dataframe with interpolated data, for each week's Wednesday
+            Nothing, but prints the point prediction and upper and lower bounds of the interval
         """
 
+        # Check if there's a classifier model if it's a hybrid model type
         try:
             grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
         except FileNotFoundError: 
             grid_classi = None
 
+        # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
         try:
             grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except FileNotFoundError: 
             grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
         
-        try:
-            best_params_reg = grid_reg.best_params_
-        except AttributeError:
-            best_params_reg = grid_reg.estimator_
+        best_params_reg = grid_reg.best_params_
 
         y_test = np.exp(y_test) - epsilon
 
@@ -884,15 +956,17 @@ class Model:
                 models.append(modelo)
             elif model_type == "hrf":
                 y_boot_actual = np.exp(y_boot) - epsilon
-                y_boot_bin = pd.Series((y_boot_actual > 0).astype(int))
+                y_boot_binary = pd.Series((y_boot_actual > 0).astype(int))
 
+                # Skip classification step if classifier was not used in the original model
                 if grid_classi != None:
+                    # Using TunedThresholdClassifier returns a different object that does not have a best_params_ attribute, but the resulting model can be obtained directly
                     try:
                         best_params_classi = grid_classi.best_params_
                         modelo_classi = RandomForestClassifier(**best_params_classi, random_state = 42)
                     except AttributeError:
                         modelo_classi = grid_classi.estimator_
-                    modelo_classi.fit(X_boot, y_boot_bin)
+                    modelo_classi.fit(X_boot, y_boot_binary)
                     models_classi.append(modelo_classi)
 
                 mask_pos_train = y_boot_actual > 0 
@@ -903,15 +977,17 @@ class Model:
                 models.append(modelo_reg)
             elif model_type == "hxgb":
                 y_boot_actual = np.exp(y_boot) - epsilon
-                y_boot_bin = pd.Series((y_boot_actual > 0).astype(int))
+                y_boot_binary = pd.Series((y_boot_actual > 0).astype(int))
 
+                # Skip classification step if classifier was not used in the original model
                 if grid_classi != None:
+                    # Using TunedThresholdClassifier returns a different object that does not have a best_params_ attribute, but the resulting model can be obtained directly
                     try:
                         best_params_classi = grid_classi.best_params_
                         modelo_classi = XGBClassifier(**best_params_classi, random_state = 42)
                     except AttributeError:
                         modelo_classi = grid_classi.estimator_
-                    modelo_classi.fit(X_boot, y_boot_bin)
+                    modelo_classi.fit(X_boot, y_boot_binary)
                     models_classi.append(modelo_classi)
 
                 mask_pos_train = y_boot_actual > 0 
@@ -921,6 +997,7 @@ class Model:
                 modelo_reg.fit(X_boot_1, y_boot_1)
                 models.append(modelo_reg)
 
+        # If there's no classification model in the hybrid case, predictions can be obtained directly from the regression model. However, in the other case, predicted cases by the regression model are changed if the classifier model first predicted that they were zero
         if grid_classi == None:                     
             predictions = np.array([model.predict(X_test) for model in models])
             predictions = np.exp(predictions) - epsilon
