@@ -47,7 +47,8 @@ class Model:
         """
     
         self.canton = canton
-        self.df = df[df["week_canton"].str.contains(canton)] # Filter for the desired canton
+        if canton != "full":
+            self.df = df[df["week_canton"].str.contains(canton)] # Filter for the desired canton
         self.df.drop(columns = ["tmax_mean"], inplace = True)
         self.df.drop(columns = ["tmin_mean"], inplace = True)
         self.df.drop(columns = ["temp_prom"], inplace = True)
@@ -655,26 +656,6 @@ class Model:
             }
             grid_classi = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, verbose=0, scoring="roc_auc")
             grid_classi.fit(X_combined, y_train_binary)
-            
-            best_clf = grid_classi.best_estimator_
-
-            # There were some issues with constant classifier predictions happening because of the low quantity of data. If this happens, threshold tuning is skipped.
-            try:
-                clf_tuned = TunedThresholdClassifierCV(
-                    estimator=best_clf,
-                    scoring="roc_auc",
-                    cv=5,
-                    n_jobs=-1,
-                    random_state=42
-                )
-                clf_tuned.fit(X_combined, y_train_binary)
-                y_pred_classi = clf_tuned.predict(X_test)
-                grid_classi = clf_tuned  
-            except ValueError as e:
-                print(f"Threshold tuning failed: {e}")
-                print("Using best classifier directly without threshold tuning.")
-                y_pred_classi = best_clf.predict(X_test)
-                grid_classi = best_clf  
 
             print(classification_report(y_test_binary, y_pred_classi))
 
@@ -801,7 +782,24 @@ class Model:
 
         else:
             print("Invalid regression model")
+        
+        nrmse_threshold = [] 
 
+        thresholds = range(0, 1.01, step = 0.01)
+        probabilities = best_clf.predict_proba(X_test)[:, 1]
+        y_test_actual = np.exp(y_test) - epsilon
+
+        for threshold in thresholds:
+            y_pred_classi = (probabilities >= threshold).astype(int)
+            y_test_actual = np.exp(y_test) - epsilon
+            y_pred_reg_temp = np.exp(y_pred_reg) - epsilon
+            y_pred_reg_temp = np.where(y_pred_classi == 0, 0, y_pred_reg_temp)
+            rmse_temp = root_mean_squared_error(y_test_actual, y_pred_reg_temp)
+            nrmse_temp = rmse_temp / np.mean(y_test_actual) 
+            nrmse_threshold.append(nrmse_temp)
+        
+        best_threshold = np.min(nrmse_temp)
+        y_pred_classi = (probabilities >= best_threshold).astype(int)
         y_test_actual = np.exp(y_test) - epsilon
         y_pred_reg = np.exp(y_pred_reg) - epsilon
         y_pred_reg = np.where(y_pred_classi == 0, 0, y_pred_reg)
