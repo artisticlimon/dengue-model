@@ -153,7 +153,7 @@ lag_8_df <- function(df, var) {
 # Casos 
 
 ```{r}
-casos <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\casos_dengue.csv)")
+casos <- read.csv(r"(C:\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\casos_dengue.csv)")
 
 colnames(casos)[which(colnames(casos) == "week.canton")] = "week_canton"
 ```
@@ -188,23 +188,23 @@ casos_lags <- casos_lag_8 |>
 ```
 
 ```{r}
-write.csv(casos_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\lags\casos_dengue_lags.csv)")
+write.csv(casos_lags, r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\lags\casos_dengue_lags.csv)")
 ```
 
 # Riesgo relativo
 
 ```{r}
-rr_num <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\relative_risk.csv)") |> 
+rr_num <- read.csv(r"(C:\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\relative_risk.csv)") |> 
   select(rr, week.canton)
 
 colnames(rr_num)[which(colnames(rr_num) == "week.canton")] = "week_canton"
 
-rr_clasi <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\relative_risk.csv)") |> 
+rr_clasi <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\relative_risk.csv)") |> 
   select(clasi_rr, week.canton)
 
 colnames(rr_clasi)[which(colnames(rr_clasi) == "week.canton")] = "week_canton"
 
-rr_clasi_no_0 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\relative_risk.csv)") |> 
+rr_clasi_no_0 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\relative_risk.csv)") |> 
   select(clasi_rr_no_0, week.canton)
 
 colnames(rr_clasi_no_0)[which(colnames(rr_clasi_no_0) == "week.canton")] = "week_canton"
@@ -222,13 +222,13 @@ rr_lags <- left_join(rr_num_lag, rr_clasi_lag, by = "week_canton") |>
 ```
 
 ```{r}
-write.csv(rr_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\lags\relative_risk_lags.csv)")
+write.csv(rr_lags, r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\lags\relative_risk_lags.csv)")
 ```
 
 # Tmax
 
 ```{r}
-tmax_mean <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\tmax_weekly.csv)") |> 
+tmax_mean <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\tmax_weekly.csv)") |> 
   select(week_canton, tmax_mean)
 ```
 
@@ -237,13 +237,13 @@ tmax_mean_lag <- lag_8_df(tmax_mean, "tmax_mean")
 ```
 
 ```{r}
-write.csv(tmax_mean_lag, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\lags\tmax_lags.csv)")
+write.csv(tmax_mean_lag, r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\lags\tmax_lags.csv)")
 ```
 
 # Tmin
 
 ```{r}
-tmin_mean <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\tmin_weekly.csv)") |> 
+tmin_mean <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\tmin_weekly.csv)") |> 
   select(week_canton, tmin_mean)
 ```
 
@@ -252,13 +252,13 @@ tmin_mean_lag <- lag_8_df(tmin_mean, "tmin_mean")
 ```
 
 ```{r}
-write.csv(tmin_mean_lag, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\lags\tmin_lags.csv)")
+write.csv(tmin_mean_lag, r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\lags\tmin_lags.csv)")
 ```
 
 # Temp_prom
 
 ```{r}
-temp_prom <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\temp_prom.csv)") |> 
+temp_prom <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\temp_prom.csv)") |> 
   select(week_canton, temp_prom)
 ```
 
@@ -267,25 +267,25 @@ temp_prom_lag <- lag_8_df(temp_prom, "temp_prom")
 ```
 
 ```{r}
-write.csv(temp_prom_lag, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\lags\temp_prom_lags.csv)")
+write.csv(temp_prom_lag, r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\lags\temp_prom_lags.csv)")
 ```
 
 # CHIRPS
 
 ```{r}
-precip_total <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\precip_weekly.csv)") |> 
+precip_total <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\precip_weekly.csv)") |> 
   select(week_canton, precip_total) 
 
-precip_min <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\precip_weekly.csv)") |> 
+precip_min <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\precip_weekly.csv)") |> 
   select(week_canton, precip_min) 
 
-precip_max <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\precip_weekly.csv)") |> 
+precip_max <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\precip_weekly.csv)") |> 
   select(week_canton, precip_max)
 
-precip_mean <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\precip_weekly.csv)") |> 
+precip_mean <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\precip_weekly.csv)") |> 
   select(week_canton, precip_mean)
 
-precip_median<- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\precip_weekly.csv)") |> 
+precip_median<- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\precip_weekly.csv)") |> 
   select(week_canton, precip_median)
 ```
 
@@ -305,55 +305,55 @@ precip_lags <- left_join(precip_total_lag, precip_max_lag, by = "week_canton") |
 ```
 
 ```{r}
-write.csv(precip_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\lags\precip_lags.csv)")
+write.csv(precip_lags, r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\lags\precip_lags.csv)")
 ```
 
 # Trends
 
 ```{r}
-trends_1 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_1 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, aedes_aegypti = aedes_aegypti)
 
-trends_2 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_2 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, criaderos_de_mosquito)
 
-trends_3 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_3 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, fiebre)
 
-trends_4 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_4 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, plaquetas)
 
-trends_5 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_5 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, buscar_trabajo)
 
-trends_6 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_6 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, desempleo)
 
-trends_7 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_7 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, empleo)
 
-trends_8 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_8 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, comprar_carro)
 
-trends_9 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_9 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, préstamo)
 
-trends_10 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_10 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, tiquetes_avion)
 
-trends_11 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_11 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, vacaciones)
 
-trends_12 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_12 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, corte_agua)
 
-trends_13 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_13 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, corte_de_agua)
 
-trends_14 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_14 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, suspension_de_agua)
 
-trends_15 <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\trends_keywords.csv)") |> 
+trends_15 <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\trends_keywords.csv)") |> 
   select(week_canton, dengue)
 ```
 
@@ -393,13 +393,13 @@ trends_lags <- left_join(trends_1_lag, trends_2_lag, by = "week_canton") |>
 ```
 
 ```{r}
-write.csv(trends_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\lags\trends_keywords_lags.csv)")
+write.csv(trends_lags, r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\lags\trends_keywords_lags.csv)")
 ```
 
 # SST
 
 ```{r}
-sst <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\SST_int.csv)") |> 
+sst <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\SST_int.csv)") |> 
   select(week_canton, nino34ssta)
 ```
 
@@ -408,13 +408,13 @@ sst_lags <- lag_8_df(sst, "nino34ssta")
 ```
 
 ```{r}
-write.csv(sst_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\lags\sst_lags.csv)")
+write.csv(sst_lags, r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\lags\sst_lags.csv)")
 ```
 
 # NDVI
 
 ```{r}
-ndvi <- read.csv(r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\NDVI_int.csv)") |> 
+ndvi <- read.csv(r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\NDVI_int.csv)") |> 
   select(week_canton, ndvi)
 ```
 
@@ -423,5 +423,5 @@ ndvi_lags <- lag_8_df(ndvi, "ndvi")
 ```
 
 ```{r}
-write.csv(ndvi_lags, r"(C:\Users\nan\OneDrive - Universidad de Costa Rica\cuenta personal\ucr pers\practica profesional\practica dengue\dengue-model\data\interim\lags\NDVI_lags.csv)")
+write.csv(ndvi_lags, r"(\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\interim\lags\NDVI_lags.csv)")
 ```
