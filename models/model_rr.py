@@ -3,11 +3,11 @@ This script contains the Model class used to train and evaluate the different mo
 """
 
 import pandas as pd
-from sklearn.metrics import classification_report, mean_absolute_error, root_mean_squared_error
+from sklearn.metrics import root_mean_squared_error
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 import numpy as np
-from sklearn.model_selection import GridSearchCV, PredefinedSplit, TunedThresholdClassifierCV
+from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from xgboost import XGBClassifier
 import joblib
 from xgboost import XGBRegressor
@@ -45,10 +45,12 @@ class Model:
         ----
             Nothing, but initializes the class with the filtered and cleaned dataframe for the desired canton.
         """
-    
+
         self.canton = canton
         if canton != "full":
             self.df = df[df["week_canton"].str.contains(canton)] # Filter for the desired canton
+        else:
+            self.df = df    
         self.df.drop(columns = ["tmax_mean"], inplace = True)
         self.df.drop(columns = ["tmin_mean"], inplace = True)
         self.df.drop(columns = ["temp_prom"], inplace = True)
@@ -290,9 +292,9 @@ class Model:
 
         return imp_df
 
-    def rfecv_selection(self, model_type, X_combined, y_combined, X_test, y_test, pds, repeats, var = "RR"):
+    def rfecv_selection(self, model_type, X_combined, y_combined, X_test, y_test, pds, epsilon, repeats, var = "RR"):
 
-        """
+        """ 
         Method that performs Recursive Feature Elimination with Cross-Validation (RFECV) to select the most important features for the specified model type, using the combined train and validation set. It reads the trained model from the saved models folder, performs RFECV to select the optimal number of features, and then fits a new model with only the selected features. Finally, it calculates the NRMSE for the test set using the new model and plots the feature importance for the selected features.
 
         Parameters
@@ -314,6 +316,9 @@ class Model:
 
         pds: PredefinedSplit
             the predefined split object that specifies which data points belong to train and which to validation, to be used for RFECV.
+
+        epsilon: float
+            number used to transform the target variable, that is used here to transform the mean in case that it's zero when calculating NRMSE
         
         repeats: int
             the number of times to permute a feature for calculating the permutation importance, to be used as the n_repeats parameter in the sklearn function permutation_importance when calculating the feature importance for the selected features after performing RFECV.
@@ -381,9 +386,13 @@ class Model:
         final_model.fit(X_combined[selected_features], y_combined)
 
         final_model_pred = final_model.predict(X_test[selected_features])
+
+        y_test = np.exp(y_test) - epsilon
+        final_model_pred = np.exp(final_model_pred) - epsilon
+        
         rmse = root_mean_squared_error(y_test, final_model_pred)
 
-        nrmse = rmse / np.mean(y_test)
+        nrmse = rmse / (np.mean(y_test) + epsilon)
 
         print(f"New NRMSE with selected features: {nrmse:.4f}")
         
@@ -630,7 +639,8 @@ class Model:
 
         Returns
         ----
-            Nothing, but it saves the model results and the trained model, and prints when it is ready.
+            best_threshold: float
+                return the best threshold so that i can be saved to calculate intervals
         """
 
         X_combined = X_combined.reset_index(drop=True)
@@ -643,23 +653,22 @@ class Model:
         y_test_actual = np.exp(y_test) - epsilon 
         y_train_binary = pd.Series((y_combined_actual > 0).astype(int)).reset_index(drop=True) 
         y_test_binary = pd.Series((y_test_actual > 0).astype(int)).reset_index(drop=True) 
-        if y_test_binary.nunique() < 2:
-            print(f"WARNING: Test set only contains one label: {y_test_binary.unique()[0]}")
+        if y_train_binary.nunique() < 2:
+            print(f"WARNING: train set only contains one label: {y_train_binary.unique()[0]}")
 
-        if model_type == "hrf" and y_test_binary.nunique() >= 2:
-            clf = RandomForestClassifier(oob_score=True, random_state=42)
+        if model_type == "hrf" and y_train_binary.nunique() >= 2:
+            clf = RandomForestClassifier(random_state=42)
             param_grid = {
                 "max_depth": [3, 5, 7, 9],
                 "min_samples_split": [10, 50, 75, 100, 150],
                 "ccp_alpha": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
-                "criterion": ["gini", "entropy"]
+                "criterion": ["gini", "entropy"],
+                "class_weight": [None, "balanced"]
             }
-            grid_classi = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, verbose=0, scoring="roc_auc")
+            grid_classi = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, verbose=0, scoring="precision")
             grid_classi.fit(X_combined, y_train_binary)
 
-            print(classification_report(y_test_binary, y_pred_classi))
-
-        elif model_type == "hxgb" and y_test_binary.nunique() >= 2:
+        elif model_type == "hxgb" and y_train_binary.nunique() >= 2:
             clf = XGBClassifier(random_state=42)
             param_grid = {
                 "max_depth": [3, 5, 7, 9],
@@ -668,32 +677,11 @@ class Model:
                 "reg_lambda": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10],
                 "eval_metric": ["logloss"]
             }
-            grid_classi = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, scoring="roc_auc")
-            grid_classi.fit(X_combined, y_train_binary)
-            best_clf = grid_classi.best_estimator_
-
-            # There were some issues with constant classifier predictions happening because of the low quantity of data. If this happens, threshold tuning is skipped.
-            try:
-                clf_tuned = TunedThresholdClassifierCV(
-                    estimator=best_clf,
-                    scoring="roc_auc",
-                    cv=5,
-                    n_jobs=-1,
-                    random_state=42
-                )
-                clf_tuned.fit(X_combined, y_train_binary)
-                y_pred_classi = clf_tuned.predict(X_test)
-                grid_classi = clf_tuned  
-            except ValueError as e:
-                print(f"Threshold tuning failed: {e}")
-                print("Using best classifier directly without threshold tuning.")
-                y_pred_classi = best_clf.predict(X_test)
-                grid_classi = best_clf  
-            
-            print(classification_report(y_test_binary, y_pred_classi))
-            # RocCurveDisplay.from_predictions(y_test_bin, clf.predict_proba(X_test)[:, 1], plot_chance_level= True)
+            grid_classi = GridSearchCV(clf, param_grid, cv=pds, n_jobs=-1, scoring="precision")
+            grid_classi.fit(X_combined, y_train_binary)  
+        
         elif y_test_binary.nunique() < 2:
-            print("Only one class present in test set for classification. Skipping classification step.")
+            print("Only one class present in train set for classification. Skipping classification step.")
             grid_classi = None
             y_pred_classi = np.repeat(y_test_binary.unique(), len(y_test_binary))  
         else:
@@ -706,17 +694,34 @@ class Model:
         # If all cases are 0, skip
         if mask_pos_train.sum() == 0:
             print("No positive cases in train available for regression after filtering.")
+            y_test_actual = np.exp(y_test) - epsilon
+            y_pred_reg = np.zeros(len(X_test))
+
+            results = pd.DataFrame({
+                "actual": y_test_actual,
+                "pred": y_pred_reg,
+                "week_canton": test["week_canton"].values
+            })
+
+            results.to_csv(
+                f"../../data/model_results/results_{model_type}_{self.canton}.csv",
+                index=False
+            )
+
+            print(f"{model_type} ready for {self.canton}")
+
+            return None
         
         # Create predefined split to differentiate between train and validation points when the model is being tuned
-        n_val_filtered = mask_pos_train[:len(X_train)].sum()
-        n_train_filtered = mask_pos_train.iloc[len(X_train):].sum() 
-        split_indices_1 = np.zeros(len(X_combined_1))
-        split_indices_1[:n_train_filtered] = 0
-        split_indices_1[n_train_filtered:] = -1   
-        pds_1 = PredefinedSplit(test_fold=split_indices_1)
+        n_train_filtered = mask_pos_train[:len(X_train)].sum()
+        n_val_filtered = mask_pos_train[len(X_train):].sum()
+
+        split_indices_1 = np.empty(len(X_combined_1))
+        split_indices_1[:n_train_filtered] = -1
+        split_indices_1[n_train_filtered:] = 0
 
         if model_type == "hrf":
-            reg_model = RandomForestRegressor(oob_score=True, random_state=42)
+            reg_model = RandomForestRegressor(random_state=42)
 
             param_grid = {
                         'max_depth': [3, 5, 7, 9],
@@ -725,9 +730,13 @@ class Model:
                         "criterion": ["squared_error", "absolute_error"]
             }
 
-            if n_train_filtered == 0 or n_val_filtered == 0:
-                    print(f"WARNING: No positive cases in some set (n_train={n_train_filtered}, n_val={n_val_filtered}). Using cv=5.")
-                    pds_1 = 5
+            if n_val_filtered == 0:
+                print(
+                    "No positive validation observations after filtering. "
+                    "Skipping hyperparameter tuning."
+                )
+
+                reg_model.fit(X_combined_1, y_combined_1)
             else:
                     split_indices_1 = np.zeros(len(X_combined_1))
                     split_indices_1[:n_train_filtered] = 0
@@ -736,17 +745,17 @@ class Model:
                     pds_1 = pds_1
                     print(f"Using PredefinedSplit: n_train={n_train_filtered}, n_val={n_val_filtered}")
 
-            grid_reg = GridSearchCV(
-                estimator=reg_model, 
-                param_grid=param_grid, 
-                cv=pds_1, 
-                scoring='neg_mean_squared_error', 
-                n_jobs=-1
-            )
-            
-            grid_reg.fit(X_combined_1, y_combined_1)
-            reg_model = grid_reg.best_estimator_
-            y_pred_reg = grid_reg.predict(X_test)
+                    grid_reg = GridSearchCV(
+                        estimator=reg_model, 
+                        param_grid=param_grid, 
+                        cv=pds_1, 
+                        scoring='neg_mean_squared_error', 
+                        n_jobs=-1
+                    )
+                    
+                    grid_reg.fit(X_combined_1, y_combined_1)
+                    reg_model = grid_reg.best_estimator_
+                    y_pred_reg = grid_reg.predict(X_test)
 
         elif model_type == "hxgb":
             reg_model = XGBRegressor(random_state=42)
@@ -758,9 +767,10 @@ class Model:
                 "reg_lambda": [0, 1 / 10**5, 1 / 10**4, 1 / 10**3, 0.01, 0.1, 1, 10]
             }
 
-            if n_train_filtered == 0 or n_val_filtered == 0:
-                print(f"WARNING: No positive cases in some set (n_train={n_train_filtered}, n_val={n_val_filtered}). Using cv=5.")
-                pds_1 = 5
+            if n_val_filtered == 0:
+                print("No positive validation observations after filtering. Skipping hyperparameter tuning.")
+                reg_model.fit(X_combined_1, y_combined_1)
+                
             else:
                 split_indices_1 = np.zeros(len(X_combined_1))
                 split_indices_1[:n_train_filtered] = 0
@@ -768,46 +778,62 @@ class Model:
                 pds_1 = PredefinedSplit(test_fold=split_indices_1)
                 print(f"Using PredefinedSplit: n_train={n_train_filtered}, n_val={n_val_filtered}")
             
-            grid_reg = GridSearchCV(
-                reg_model,
-                param_grid,
-                cv=pds_1,
-                n_jobs=-1,
-                verbose=0,
-                scoring="neg_mean_squared_error",
-            )
-            grid_reg.fit(X_combined_1, y_combined_1)
-            reg_model = grid_reg.best_estimator_
-            y_pred_reg = grid_reg.predict(X_test)
+                grid_reg = GridSearchCV(
+                    reg_model,
+                    param_grid,
+                    cv=pds_1,
+                    n_jobs=-1,
+                    verbose=0,
+                    scoring="neg_mean_squared_error",
+                )
+                grid_reg.fit(X_combined_1, y_combined_1)
+                reg_model = grid_reg.best_estimator_
+                y_pred_reg = grid_reg.predict(X_test)
 
         else:
             print("Invalid regression model")
-        
-        nrmse_threshold = [] 
 
-        thresholds = range(0, 1.01, step = 0.01)
-        probabilities = best_clf.predict_proba(X_test)[:, 1]
-        y_test_actual = np.exp(y_test) - epsilon
+        if grid_classi != None:
+            best_classi = grid_classi.best_estimator_
 
-        for threshold in thresholds:
-            y_pred_classi = (probabilities >= threshold).astype(int)
+            split_indices = pds.test_fold
+            val_mask = split_indices == 0
+            X_val = X_combined.loc[val_mask].reset_index(drop=True)
+            y_val = y_combined.loc[val_mask].reset_index(drop=True)
+
+            thresholds = [x / 100 for x in range(0, 101)]
+            probabilities_val = best_classi.predict_proba(X_val)[:, 1]
             y_test_actual = np.exp(y_test) - epsilon
-            y_pred_reg_temp = np.exp(y_pred_reg) - epsilon
-            y_pred_reg_temp = np.where(y_pred_classi == 0, 0, y_pred_reg_temp)
-            rmse_temp = root_mean_squared_error(y_test_actual, y_pred_reg_temp)
-            nrmse_temp = rmse_temp / np.mean(y_test_actual) 
-            nrmse_threshold.append(nrmse_temp)
-        
-        best_threshold = np.min(nrmse_temp)
-        y_pred_classi = (probabilities >= best_threshold).astype(int)
-        y_test_actual = np.exp(y_test) - epsilon
-        y_pred_reg = np.exp(y_pred_reg) - epsilon
-        y_pred_reg = np.where(y_pred_classi == 0, 0, y_pred_reg)
+            val_pred_reg = grid_reg.predict(X_val)
+            val_pred_reg_actual = np.exp(val_pred_reg) - epsilon
+            y_val_actual = np.exp(y_val) - epsilon
+
+            best_threshold = None
+            best_nrmse = np.inf
+
+            for threshold in thresholds:
+                y_pred_classi = (probabilities_val >= threshold).astype(int)
+                y_pred_reg_temp = np.where(y_pred_classi == 0, 0, val_pred_reg_actual)
+                rmse_temp = root_mean_squared_error(y_val_actual, y_pred_reg_temp)
+                nrmse_temp = rmse_temp / (np.mean(y_val_actual) + epsilon)
+                if nrmse_temp < best_nrmse:
+                    best_nrmse = nrmse_temp
+                    best_threshold = threshold
+
+        if grid_classi != None:
+            probabilities_test = best_classi.predict_proba(X_test)[:, 1]
+            y_pred_classi = (probabilities_test >= best_threshold).astype(int)
+            y_pred_reg = np.exp(y_pred_reg) - epsilon
+            y_pred_reg = np.where(y_pred_classi == 0, 0, y_pred_reg)
+        else:
+            best_threshold = None
+            y_test_actual = np.exp(y_test) - epsilon
+            y_pred_reg = np.exp(y_pred_reg) - epsilon
 
         results = pd.DataFrame({
             "actual": y_test_actual,
             "pred": y_pred_reg,
-            "week_canton": test["week_canton"].values,
+            "week_canton": test["week_canton"].values
         })
 
         results.to_csv(f"../../data/model_results/results_{model_type}_{self.canton}.csv", index=False)
@@ -819,6 +845,8 @@ class Model:
         joblib.dump(grid_reg, f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
 
         print(f"{model_type} ready for {self.canton}")
+
+        return best_threshold
 
     def ticks_years_top(self, ax, n):
 
@@ -845,7 +873,7 @@ class Model:
                 tick.tick2line.set_visible(False)
                 tick.gridline.set_visible(False) 
 
-    def calculate_nrmse(self, model_type):
+    def calculate_nrmse(self, model_type, epsilon):
 
         """
         Method that calculates the NRMSE for the predictions from a model of a certain type, using the class instance canton.
@@ -868,7 +896,7 @@ class Model:
 
         rmse = root_mean_squared_error(results["actual"], results["pred"])
 
-        nrmse = rmse / np.mean(results["actual"])
+        nrmse = rmse / (np.mean(results["actual"]) + epsilon)
 
         return self.canton, nrmse
 
@@ -1006,7 +1034,7 @@ class Model:
             predictions = np.array([np.where(y_pred_classi == 0, 0, y_pred_reg) for y_pred_classi, y_pred_reg in zip(predictions_classi, predictions_reg)])
 
 
-        nrmse = np.array([root_mean_squared_error(y_true = y_test, y_pred = pred) / np.mean(y_test) for pred in predictions])
+        nrmse = np.array([root_mean_squared_error(y_true = y_test, y_pred = pred) / (np.mean(y_test) + epsilon) for pred in predictions])
 
         y_pred_point = np.mean(nrmse)
 
