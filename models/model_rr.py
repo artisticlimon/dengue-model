@@ -527,7 +527,7 @@ class Model:
         
         rmse = root_mean_squared_error(y_test_actual, final_model_pred)
 
-        nrmse = rmse / (np.mean(y_test) + epsilon)
+        nrmse = rmse / (np.mean(y_test_actual) + epsilon)
 
         print(f"New NRMSE with selected features: {nrmse:.4f}")
         
