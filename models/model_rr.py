@@ -7,7 +7,7 @@ from sklearn.metrics import root_mean_squared_error
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 import numpy as np
-from sklearn.model_selection import GridSearchCV, PredefinedSplit
+from sklearn.model_selection import GridSearchCV, PredefinedSplit, TimeSeriesSplit
 from xgboost import XGBClassifier
 import joblib
 from xgboost import XGBRegressor
@@ -20,29 +20,78 @@ from sklearn.base import clone, BaseEstimator, RegressorMixin
 
 class Hybrid(BaseEstimator, RegressorMixin):
 
-    def __init__(self, classifier, regressor, threshold):
+    def __init__(self, classifier, regressor, threshold, epsilon):
         self.classifier = classifier
         self.regressor = regressor
         self.threshold = threshold
+        self.epsilon = epsilon
 
-    def fit(self, X, y, epsilon):
-        y_actual = np.exp(y) - epsilon
-
+    def fit(self, X, y):
+        y_actual = np.exp(y) - self.epsilon
         y_binary = (y_actual > 0).astype(int)
 
-        self.classifier.fit(X, y_binary)
+        self.classifier_ = None if self.classifier is None else clone(self.classifier)
+        self.regressor_ = clone(self.regressor)
+
+        if self.classifier_ is not None:
+
+            unique_classes = np.unique(y_binary)
+
+            if len(unique_classes) < 2:
+                self.single_class_ = unique_classes[0]
+
+            else:
+                self.single_class_ = None
+                self.classifier_.fit(X, y_binary)
+
+        else:
+            self.single_class_ = None
 
         mask = y_binary == 1
-        self.regressor.fit(X[mask], y[mask])
 
+        if mask.sum() == 0:
+            self.no_positive_cases_ = True
+            return self
+
+        self.no_positive_cases_ = False
+
+        self.regressor_.fit(X[mask], y[mask])
         return self
 
     def predict(self, X):
-        probs = self.classifier.predict_proba(X)[:, 1]
 
-        reg_pred = self.regressor.predict(X)
+        if getattr(self, "no_positive_cases_", False):
+            return np.full(len(X), np.log(self.epsilon))
+        
+        if getattr(self, "single_class_", None) == 0:
+            return np.full(len(X), np.log(self.epsilon))
 
-        return np.where(probs >= self.threshold, reg_pred, 0)
+        reg_pred = self.regressor_.predict(X)
+
+        if getattr(self, "single_class_", None) == 1:
+            return reg_pred
+
+        if self.classifier_ is None:
+            return reg_pred
+        
+        probs = self.classifier_.predict_proba(X)[:, 1]
+
+        return np.where(probs >= self.threshold, reg_pred, np.log(self.epsilon))
+
+    @property
+    def feature_importances_(self):
+
+        reg_imp = self.regressor_.feature_importances_
+
+        if (
+            self.classifier_ is None
+            or getattr(self, "single_class_", None) is not None
+        ):
+            return reg_imp
+
+        class_imp = self.classifier_.feature_importances_
+
+        return (reg_imp + class_imp) / 2
 
 class Model:
 
@@ -270,7 +319,7 @@ class Model:
         ax.set_title(f"{model_type} for {self.canton}")
         plt.show()
     
-    def var_importance(self, X_test, y_test, model_type, repeats, var = "RR"):
+    def var_importance(self, X_combined, y_combined, X_test, y_test, model_type, epsilon, repeats, var = "RR"):
 
         """
         Method that calculates and plots the permutation importance of the features for the specified model type, using the test set. It reads the trained model from the saved models folder, calculates the permutation importance using the sklearn function, and then creates a horizontal bar plot with the importance scores for the top 10 features.
@@ -296,34 +345,42 @@ class Model:
 
         # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
         try:
-            grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
+            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except FileNotFoundError: 
-            grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
+            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
         
-        model = grid.best_estimator_
+        model = grid_reg.best_estimator_
 
         if model_type == "hrf" or model_type == "hxgb":
             try:
                 grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
-            except: 
-                grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
-
+            except FileNotFoundError:
+                grid_classi = None
+        
             if self.canton == "full":
                 thresholds = pd.read_csv(f"../../data/model_results/thresholds/full_threshold_{model_type}.csv")
-                best_threshold = thresholds[thresholds["canton"] == self.canton]["threshold"].values[0]
+                thresholds["canton"] = thresholds["canton"].astype(str)
+                best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
+                classifier = None if grid_classi is None else grid_classi.best_estimator_
                 model = Hybrid(
-                    classifier= grid_reg.best_estimator_,
-                    regressor= grid_classi.best_estimator_,
-                    threshold= best_threshold
+                    classifier= classifier,
+                    regressor= grid_reg.best_estimator_,
+                    threshold= best_threshold,
+                    epsilon = epsilon
                 )
+                model.fit(X_combined, y_combined)
             else: 
                 thresholds = pd.read_csv(f"../../data/model_results/thresholds/thresholds_{model_type}.csv")
-                best_threshold = thresholds[thresholds["canton"] == self.canton]["threshold"].values[0]
+                thresholds["canton"] = thresholds["canton"].astype(str)
+                best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
+                classifier = None if grid_classi is None else grid_classi.best_estimator_
                 model = Hybrid(
-                    classifier= grid_reg.best_estimator_,
-                    regressor= grid_classi.best_estimator_,
-                    threshold= best_threshold
+                    classifier= classifier,
+                    regressor= grid_reg.best_estimator_,
+                    threshold= best_threshold,
+                    epsilon = epsilon
                 )
+                model.fit(X_combined, y_combined)
 
         r = permutation_importance(model, X_test, y_test, n_repeats=repeats, random_state=42, scoring='neg_mean_squared_error', n_jobs = -1)
 
@@ -382,33 +439,39 @@ class Model:
 
         # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
         try:
-            grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
+            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except FileNotFoundError: 
-            grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
+            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
         
-        model = grid.best_estimator_
+        model = grid_reg.best_estimator_
 
         if model_type == "hrf" or model_type == "hxgb":
             try:
                 grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
-            except: 
-                grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
+            except FileNotFoundError: 
+                grid_classi = None
 
             if self.canton == "full":
                 thresholds = pd.read_csv(f"../../data/model_results/thresholds/full_threshold_{model_type}.csv")
-                best_threshold = thresholds[thresholds["canton"] == self.canton]["threshold"].values[0]
+                thresholds["canton"] = thresholds["canton"].astype(str)
+                best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
+                classifier = None if grid_classi is None else grid_classi.best_estimator_
                 model = Hybrid(
-                    classifier= grid_reg.best_estimator_,
-                    regressor= grid_classi.best_estimator_,
-                    threshold= best_threshold
+                    classifier= classifier,
+                    regressor= grid_reg.best_estimator_,
+                    threshold= best_threshold,
+                    epsilon = epsilon
                 )
             else: 
                 thresholds = pd.read_csv(f"../../data/model_results/thresholds/thresholds_{model_type}.csv")
-                best_threshold = thresholds[thresholds["canton"] == self.canton]["threshold"].values[0]
+                thresholds["canton"] = thresholds["canton"].astype(str)
+                best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
+                classifier = None if grid_classi is None else grid_classi.best_estimator_
                 model = Hybrid(
-                    classifier= grid_reg.best_estimator_,
-                    regressor= grid_classi.best_estimator_,
-                    threshold= best_threshold
+                    classifier= classifier,
+                    regressor= grid_reg.best_estimator_,
+                    threshold= best_threshold,
+                    epsilon = epsilon
                 )
 
         rfecv = RFECV(
@@ -459,10 +522,10 @@ class Model:
 
         final_model_pred = final_model.predict(X_test[selected_features])
 
-        y_test = np.exp(y_test) - epsilon
+        y_test_actual = np.exp(y_test) - epsilon
         final_model_pred = np.exp(final_model_pred) - epsilon
         
-        rmse = root_mean_squared_error(y_test, final_model_pred)
+        rmse = root_mean_squared_error(y_test_actual, final_model_pred)
 
         nrmse = rmse / (np.mean(y_test) + epsilon)
 
@@ -524,7 +587,7 @@ class Model:
         try:
             grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
         except: 
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
+            grid_classi = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
 
         best_model = grid_reg.best_estimator_
 
@@ -536,23 +599,29 @@ class Model:
             try:
                 grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
             except: 
-                grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
+                grid_classi = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
 
             if self.canton == "full":
                 thresholds = pd.read_csv(f"../../data/model_results/thresholds/full_threshold_{model_type}.csv")
-                best_threshold = thresholds[thresholds["canton"] == self.canton]["threshold"].values[0]
+                thresholds["canton"] = thresholds["canton"].astype(str)
+                best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
+                classifier = None if grid_classi is None else grid_classi.best_estimator_
                 best_model = Hybrid(
-                    classifier= grid_reg.best_estimator_,
-                    regressor= grid_classi.best_estimator_,
-                    threshold= best_threshold
+                    classifier= classifier,
+                    regressor= grid_reg.best_estimator_,
+                    threshold= best_threshold,
+                    epsilon = epsilon
                 )
             else: 
                 thresholds = pd.read_csv(f"../../data/model_results/thresholds/thresholds_{model_type}.csv")
-                best_threshold = thresholds[thresholds["canton"] == self.canton]["threshold"].values[0]
+                thresholds["canton"] = thresholds["canton"].astype(str)
+                best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
+                classifier = None if grid_classi is None else grid_classi.best_estimator_
                 best_model = Hybrid(
-                    classifier= grid_reg.best_estimator_,
-                    regressor= grid_classi.best_estimator_,
-                    threshold= best_threshold
+                    classifier= classifier,
+                    regressor= grid_reg.best_estimator_,
+                    threshold= best_threshold,
+                    epsilon = epsilon
                 )
 
         mapie_reg = TimeSeriesRegressor(
@@ -843,22 +912,21 @@ class Model:
                     "No positive validation observations after filtering. "
                     "Skipping hyperparameter tuning."
                 )
-
-                reg_model.fit(X_combined_1, y_combined_1)
+                pds_1 = TimeSeriesSplit(n_splits=5)
             else:
-                    print(f"Using PredefinedSplit: n_train={n_train_filtered}, n_val={n_val_filtered}")
+                print(f"Using PredefinedSplit: n_train={n_train_filtered}, n_val={n_val_filtered}")
 
-                    grid_reg = GridSearchCV(
-                        estimator=reg_model, 
-                        param_grid=param_grid, 
-                        cv=pds_1, 
-                        scoring='neg_mean_squared_error', 
-                        n_jobs=-1
-                    )
+            grid_reg = GridSearchCV(
+                estimator=reg_model, 
+                param_grid=param_grid, 
+                cv=pds_1, 
+                scoring='neg_mean_squared_error', 
+                n_jobs=-1
+            )
                     
-                    grid_reg.fit(X_combined_1, y_combined_1)
-                    reg_model = grid_reg.best_estimator_
-                    y_pred_reg = grid_reg.predict(X_test)
+            grid_reg.fit(X_combined_1, y_combined_1)
+            reg_model = grid_reg.best_estimator_
+            y_pred_reg = reg_model.predict(X_test)
 
         elif model_type == "hxgb":
             reg_model = XGBRegressor(random_state=42)
@@ -872,22 +940,22 @@ class Model:
 
             if n_val_filtered == 0:
                 print("No positive validation observations after filtering. Skipping hyperparameter tuning.")
-                reg_model.fit(X_combined_1, y_combined_1)
+                pds_1 = TimeSeriesSplit(n_splits=5)
                 
             else:
                 print(f"Using PredefinedSplit: n_train={n_train_filtered}, n_val={n_val_filtered}")
             
-                grid_reg = GridSearchCV(
-                    reg_model,
-                    param_grid,
-                    cv=pds_1,
-                    n_jobs=-1,
-                    verbose=0,
-                    scoring="neg_mean_squared_error",
-                )
-                grid_reg.fit(X_combined_1, y_combined_1)
-                reg_model = grid_reg.best_estimator_
-                y_pred_reg = grid_reg.predict(X_test)
+            grid_reg = GridSearchCV(
+                reg_model,
+                param_grid,
+                cv=pds_1,
+                n_jobs=-1,
+                verbose=0,
+                scoring="neg_mean_squared_error",
+            )
+            grid_reg.fit(X_combined_1, y_combined_1)
+            reg_model = grid_reg.best_estimator_
+            y_pred_reg = reg_model.predict(X_test)
 
         else:
             print("Invalid regression model")
@@ -903,7 +971,7 @@ class Model:
             thresholds = [x / 100 for x in range(0, 101)]
             probabilities_val = best_classi.predict_proba(X_val)[:, 1]
             y_test_actual = np.exp(y_test) - epsilon
-            val_pred_reg = grid_reg.predict(X_val)
+            val_pred_reg = reg_model.predict(X_val)
             val_pred_reg_actual = np.exp(val_pred_reg) - epsilon
             y_val_actual = np.exp(y_val) - epsilon
 
@@ -1052,7 +1120,7 @@ class Model:
         y_arr = y_combined
 
         bs = CircularBlockBootstrap(
-            52,
+            12,
             X_arr,
             y_arr,
             seed = 42
@@ -1082,16 +1150,21 @@ class Model:
             elif model_type == "hrf":
                 if self.canton == "full":
                     thresholds = pd.read_csv("../../data/model_results/thresholds/full_threshold_hrf.csv")
+                    thresholds["canton"] = thresholds["canton"].astype(str)
                 else: 
                     thresholds = pd.read_csv("../../data/model_results/thresholds/thresholds_hrf.csv")
-                best_threshold = thresholds[thresholds["canton"] == self.canton]["threshold"].values[0]
+                    thresholds["canton"] = thresholds["canton"].astype(str)
+                best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
 
                 y_boot_actual = np.exp(y_boot) - epsilon
                 y_boot_binary = pd.Series((y_boot_actual > 0).astype(int))
 
+                if len(np.unique(y_boot_binary)) < 2:
+                    continue
+
                 # Skip classification step if classifier was not used in the original model
                 if grid_classi != None:
-                    modelo_classi = grid_classi.estimator_
+                    modelo_classi = grid_classi.best_estimator_
                     modelo_classi.fit(X_boot, y_boot_binary)
                     prob_classi = modelo_classi.predict_proba(X_test)[:, 1]
                     prediction_probs_classi.append(prob_classi)
@@ -1099,22 +1172,30 @@ class Model:
                 mask_pos_train = y_boot_actual > 0 
                 X_boot_1 = X_boot[mask_pos_train]
                 y_boot_1 = y_boot[mask_pos_train]
-                modelo_reg = RandomForestRegressor(**best_params_reg, random_state = 42)
-                modelo_reg.fit(X_boot_1, y_boot_1)
-                models.append(modelo_reg)
+                if mask_pos_train.sum() == 0:
+                    continue
+                else:   
+                    modelo_reg = RandomForestRegressor(**best_params_reg, random_state = 42)
+                    modelo_reg.fit(X_boot_1, y_boot_1)
+                    models.append(modelo_reg)
             elif model_type == "hxgb":
                 if self.canton == "full":
                     thresholds = pd.read_csv("../../data/model_results/thresholds/full_threshold_hxgb.csv")
+                    thresholds["canton"] = thresholds["canton"].astype(str)
                 else: 
                     thresholds = pd.read_csv("../../data/model_results/thresholds/thresholds_hxgb.csv")
-                best_threshold = thresholds[thresholds["canton"] == self.canton]["threshold"].values[0]
+                    thresholds["canton"] = thresholds["canton"].astype(str)
+                best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
 
                 y_boot_actual = np.exp(y_boot) - epsilon
                 y_boot_binary = pd.Series((y_boot_actual > 0).astype(int))
 
+                if len(np.unique(y_boot_binary)) < 2:
+                    continue
+
                 # Skip classification step if classifier was not used in the original model
                 if grid_classi != None:
-                    modelo_classi = grid_classi.estimator_
+                    modelo_classi = clone(grid_classi.best_estimator_)
                     modelo_classi.fit(X_boot, y_boot_binary)
                     prob_classi = modelo_classi.predict_proba(X_test)[:, 1]
                     prediction_probs_classi.append(prob_classi)
@@ -1122,10 +1203,12 @@ class Model:
                 mask_pos_train = y_boot_actual > 0 
                 X_boot_1 = X_boot[mask_pos_train]
                 y_boot_1 = y_boot[mask_pos_train]
-                modelo_reg = XGBRegressor(**best_params_reg, random_state = 42)
-                modelo_reg.fit(X_boot_1, y_boot_1)
-                models.append(modelo_reg)
-
+                if mask_pos_train.sum() == 0:
+                    continue
+                else:   
+                    modelo_reg = XGBRegressor(**best_params_reg, random_state = 42)
+                    modelo_reg.fit(X_boot_1, y_boot_1)
+                    models.append(modelo_reg)
         # If there's no classification model in the hybrid case, predictions can be obtained directly from the regression model. However, in the other case, predicted cases by the regression model are changed if the classifier model first predicted that they were zero
         if grid_classi == None:                     
             predictions = np.array([model.predict(X_test) for model in models])
@@ -1133,7 +1216,7 @@ class Model:
         else: 
             predictions_reg = np.array([model.predict(X_test) for model in models])
             predictions_reg = np.exp(predictions_reg) - epsilon
-            predictions = np.array([np.where(prob < best_threshold, 0, 0, y_pred_reg) for prob, y_pred_reg in zip(prob_classi, predictions_reg)])
+            predictions = np.array([np.where(prob < best_threshold, 0, y_pred_reg) for prob, y_pred_reg in zip(prediction_probs_classi, predictions_reg)])
 
 
         nrmse = np.array([root_mean_squared_error(y_true = y_test, y_pred = pred) / (np.mean(y_test) + epsilon) for pred in predictions])
