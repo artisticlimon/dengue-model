@@ -8,9 +8,8 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 import numpy as np
 from sklearn.model_selection import GridSearchCV, PredefinedSplit, TimeSeriesSplit
-from xgboost import XGBClassifier
+from xgboost import XGBClassifier, XGBRegressor
 import joblib
-from xgboost import XGBRegressor
 from sklearn.inspection import permutation_importance
 from sklearn.feature_selection import RFECV
 from arch.bootstrap import CircularBlockBootstrap
@@ -301,7 +300,6 @@ class Model:
         ----
             Nothing, just shows the plot with the time series of actual and predicted relative risk values for the test set, including the confidence intervals for the predictions.
         """
-
         results = pd.read_csv(f'../../data/model_results/results_{model_type}_{self.canton}.csv')
         
         results['week_canton'] = results['week_canton'].str.extract(r'(\d{4}-\d+)').iloc[:, 0].tolist()
@@ -584,11 +582,6 @@ class Model:
         except: 
             grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
 
-        try:
-            grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
-        except: 
-            grid_classi = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
-
         best_model = grid_reg.best_estimator_
 
         cv_mapiets = BlockBootstrap(
@@ -599,7 +592,7 @@ class Model:
             try:
                 grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
             except: 
-                grid_classi = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
+                grid_classi = None
 
             if self.canton == "full":
                 thresholds = pd.read_csv(f"../../data/model_results/thresholds/full_threshold_{model_type}.csv")
@@ -636,12 +629,6 @@ class Model:
         upper_bound = np.exp(y_interval[:, 1, 0]) - epsilon
 
         y_pred_point = np.exp(y_pred_cp) - epsilon
-
-        if model_type == "hrf" or model_type == "hxgb":
-            if self.canton == "full":
-                thresholds = pd.read_csv(f"../../data/model_results/thresholds/full_threshold_{model_type}.csv")
-            else: 
-                thresholds = pd.read_csv(f"../../data/model_results/thresholds/thresholds_{model_type}.csv")
 
         return y_pred_point, lower_bound, upper_bound
 
@@ -1130,9 +1117,9 @@ class Model:
         prediction_probs_classi = []
 
         if grid_classi == None and model_type == "hrf":
-                print("Only one class present in test set for classification. Skipping classification step.")
+                print("Only one class present in train set for classification. Skipping classification step.")
         elif grid_classi == None and model_type == "hxgb":
-                print("Only one class present in test set for classification. Skipping classification step.")
+                print("Only one class present in train set for classification. Skipping classification step.")
 
         for data in bs.bootstrap(n_bootstraps):
 
@@ -1140,11 +1127,11 @@ class Model:
             y_boot = data[0][1]
 
             if model_type == "rf":
-                modelo = RandomForestRegressor(**best_params_reg, random_state = 42)
+                modelo = RandomForestRegressor(**best_params_reg, random_state = 42, n_jobs= -1)
                 modelo.fit(X_boot, y_boot)
                 models.append(modelo)
             elif model_type == "xgb":
-                modelo = XGBRegressor(**best_params_reg, random_state = 42) 
+                modelo = XGBRegressor(**best_params_reg, random_state = 42, n_jobs= -1) 
                 modelo.fit(X_boot, y_boot)
                 models.append(modelo)
             elif model_type == "hrf":
@@ -1175,7 +1162,7 @@ class Model:
                 if mask_pos_train.sum() == 0:
                     continue
                 else:   
-                    modelo_reg = RandomForestRegressor(**best_params_reg, random_state = 42)
+                    modelo_reg = RandomForestRegressor(**best_params_reg, random_state = 42, n_jobs= -1)
                     modelo_reg.fit(X_boot_1, y_boot_1)
                     models.append(modelo_reg)
             elif model_type == "hxgb":
@@ -1206,7 +1193,7 @@ class Model:
                 if mask_pos_train.sum() == 0:
                     continue
                 else:   
-                    modelo_reg = XGBRegressor(**best_params_reg, random_state = 42)
+                    modelo_reg = XGBRegressor(**best_params_reg, random_state = 42, n_jobs= -1)
                     modelo_reg.fit(X_boot_1, y_boot_1)
                     models.append(modelo_reg)
         # If there's no classification model in the hybrid case, predictions can be obtained directly from the regression model. However, in the other case, predicted cases by the regression model are changed if the classifier model first predicted that they were zero
@@ -1226,5 +1213,157 @@ class Model:
         lower_bound = np.percentile(nrmse, 2.5)
         upper_bound = np.percentile(nrmse, 97.5)
 
-        print(f"point estimate: {round(y_pred_point, 2)}")
-        print(f"lower bound: {round(lower_bound, 2)}, upper bound: {round(upper_bound, 2)}")
+        return self.canton, y_pred_point, lower_bound, upper_bound
+
+def confint_nrmse_full(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, n_bootstraps = 100):
+
+        """
+        Method that calculates the confidence intervals for the NRMSE using Circular Block Bootstrap  
+
+        Parameters
+        ----
+        model_type: str
+            the type of model for which to calculate the confidence intervals (options: "rf", "xgb", "hrf", "hxgb")
+
+        X_combined: dataframe
+            dataframe with the features for the combined train and validation set
+        
+        y_combined: pandas Series
+            pandas Series with the target variable (relative risk) for the combined train and validation set, log-transformed and with epsilon added
+        
+        X_test: dataframe
+            dataframe with the features for the test set
+        
+        y_test: pandas Series
+            pandas Series with the target variable (relative risk) for the test set, log-transformed and with epsilon added
+        
+        epsilon: float
+            the small value that was added to the relative risk before log-transforming it, to avoid issues with zero values. This value is subtracted from the predictions and intervals after exponentiating them, to transform them back to the original scale of relative risk.
+        
+        n_bootstraps: int
+            how many bootstrap resamplings will be conducted
+
+        Returns
+        ----
+            Nothing, but prints the point prediction and upper and lower bounds of the interval
+        """
+
+        # Check if there's a classifier model if it's a hybrid model type
+        try:
+            grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_full.joblib')
+        except FileNotFoundError: 
+            grid_classi = None
+
+        # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
+        try:
+            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_full.joblib')
+        except FileNotFoundError: 
+            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_full.joblib')
+        
+        best_params_reg = grid_reg.best_params_
+
+        y_test = np.exp(y_test) - epsilon
+
+        X_arr = X_combined
+        y_arr = y_combined
+
+        bs = CircularBlockBootstrap(
+            12,
+            X_arr,
+            y_arr,
+            seed = 42
+        )
+
+        models = []
+        prediction_probs_classi = []
+
+        if grid_classi == None and model_type == "hrf":
+                print("Only one class present in train set for classification. Skipping classification step.")
+        elif grid_classi == None and model_type == "hxgb":
+                print("Only one class present in train set for classification. Skipping classification step.")
+
+        for data in bs.bootstrap(n_bootstraps):
+
+            X_boot = data[0][0]
+            y_boot = data[0][1]
+
+            if model_type == "rf":
+                modelo = RandomForestRegressor(**best_params_reg, random_state = 42, n_jobs= -1)
+                modelo.fit(X_boot, y_boot)
+                models.append(modelo)
+            elif model_type == "xgb":
+                modelo = XGBRegressor(**best_params_reg, random_state = 42, n_jobs= -1) 
+                modelo.fit(X_boot, y_boot)
+                models.append(modelo)
+            elif model_type == "hrf":
+                thresholds = pd.read_csv("../../data/model_results/thresholds/full_threshold_hrf.csv")
+                thresholds["canton"] = thresholds["canton"].astype(str)
+                best_threshold = thresholds[thresholds["canton"] == "full"]["best_th"].values[0]
+
+                y_boot_actual = np.exp(y_boot) - epsilon
+                y_boot_binary = pd.Series((y_boot_actual > 0).astype(int))
+
+                if len(np.unique(y_boot_binary)) < 2:
+                    continue
+
+                # Skip classification step if classifier was not used in the original model
+                if grid_classi != None:
+                    modelo_classi = grid_classi.best_estimator_
+                    modelo_classi.fit(X_boot, y_boot_binary)
+                    prob_classi = modelo_classi.predict_proba(X_test)[:, 1]
+                    prediction_probs_classi.append(prob_classi)
+
+                mask_pos_train = y_boot_actual > 0 
+                X_boot_1 = X_boot[mask_pos_train]
+                y_boot_1 = y_boot[mask_pos_train]
+                if mask_pos_train.sum() == 0:
+                    continue
+                else:   
+                    modelo_reg = RandomForestRegressor(**best_params_reg, random_state = 42, n_jobs= -1)
+                    modelo_reg.fit(X_boot_1, y_boot_1)
+                    models.append(modelo_reg)
+            elif model_type == "hxgb":
+                thresholds = pd.read_csv("../../data/model_results/thresholds/full_threshold_hxgb.csv")
+                thresholds["canton"] = thresholds["canton"].astype(str)
+                best_threshold = thresholds[thresholds["canton"] == "full"]["best_th"].values[0]
+
+                y_boot_actual = np.exp(y_boot) - epsilon
+                y_boot_binary = pd.Series((y_boot_actual > 0).astype(int))
+
+                if len(np.unique(y_boot_binary)) < 2:
+                    continue
+
+                # Skip classification step if classifier was not used in the original model
+                if grid_classi != None:
+                    modelo_classi = clone(grid_classi.best_estimator_)
+                    modelo_classi.fit(X_boot, y_boot_binary)
+                    prob_classi = modelo_classi.predict_proba(X_test)[:, 1]
+                    prediction_probs_classi.append(prob_classi)
+
+                mask_pos_train = y_boot_actual > 0 
+                X_boot_1 = X_boot[mask_pos_train]
+                y_boot_1 = y_boot[mask_pos_train]
+                if mask_pos_train.sum() == 0:
+                    continue
+                else:   
+                    modelo_reg = XGBRegressor(**best_params_reg, random_state = 42, n_jobs= -1)
+                    modelo_reg.fit(X_boot_1, y_boot_1)
+                    models.append(modelo_reg)
+        # If there's no classification model in the hybrid case, predictions can be obtained directly from the regression model. However, in the other case, predicted cases by the regression model are changed if the classifier model first predicted that they were zero
+        if grid_classi == None:                     
+            predictions = np.array([model.predict(X_test) for model in models])
+            predictions = np.exp(predictions) - epsilon
+        else: 
+            predictions_reg = np.array([model.predict(X_test) for model in models])
+            predictions_reg = np.exp(predictions_reg) - epsilon
+            predictions = np.array([np.where(prob < best_threshold, 0, y_pred_reg) for prob, y_pred_reg in zip(prediction_probs_classi, predictions_reg)])
+
+
+        nrmse = np.array([root_mean_squared_error(y_true = y_test, y_pred = pred) / (np.mean(y_test) + epsilon) for pred in predictions])
+
+        y_pred_point = np.mean(nrmse)
+
+        lower_bound = np.percentile(nrmse, 2.5)
+        upper_bound = np.percentile(nrmse, 97.5)
+
+        return self.canton, y_pred_point, lower_bound, upper_bound
