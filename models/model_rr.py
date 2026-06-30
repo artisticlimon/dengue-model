@@ -16,6 +16,9 @@ from arch.bootstrap import CircularBlockBootstrap
 from mapie.regression import TimeSeriesRegressor
 from mapie.subsample import BlockBootstrap
 from sklearn.base import clone, BaseEstimator, RegressorMixin
+from numpy.typing import NDArray
+from typing import cast
+from mapie.conformity_scores import AbsoluteConformityScore
 
 class Hybrid(BaseEstimator, RegressorMixin):
 
@@ -118,7 +121,7 @@ class Model:
         ----
             Nothing, but initializes the class with the filtered and cleaned dataframe for the desired canton.
         """
-
+        self.df = df.copy()
         self.canton = canton
         if canton != "full":
             self.df = df[df["week_canton"].str.contains(canton)] # Filter for the desired canton
@@ -230,7 +233,7 @@ class Model:
 
         for i in range(5, 9):
             df_temp.drop(columns = [f"rr_lag_{i}"], inplace = True)
-
+        
         df_temp.drop(columns = ["casos_lag_1"], inplace = True)
         df_temp.drop(columns = ["clasi_rr_lag_1"], inplace = True)
         df_temp.drop(columns = ["clasi_rr_no_0_lag_1"], inplace = True)
@@ -307,12 +310,13 @@ class Model:
         fig, ax = plt.subplots()
         ax.plot(results['week_canton'], results["actual"], label='Real', marker='o', linestyle = "dashed", color = "blue")
         ax.plot(results['week_canton'], results["pred"], label='Predicted', marker='o', color = "red")
-        ax.plot(results['week_canton'], y_pred_point, label='Conformal predictions', marker='o', color = "green")
-        ax.fill_between(x = results['week_canton'], label = "CI (95%)", y1 = lower_bound, y2 = upper_bound, alpha = 0.2, color = "green")
+        #ax.plot(results['week_canton'], y_pred_point, label='Conformal predictions', marker='o', color = "green")
+        #ax.fill_between(x = results['week_canton'], label = "CI (95%)", y1 = lower_bound, y2 = upper_bound, alpha = 0.2, color = "green")
         ax.legend(loc = "upper right")
         self.ticks_years_top(ax, 20)
         ax.set_xlabel('Week')
         ax.set_ylabel(f'Relative risk')
+        ax.set_ylim(0, 7)
 
         ax.set_title(f"{model_type} for {self.canton}")
         plt.show()
@@ -539,7 +543,71 @@ class Model:
         plt.title(f"Feature Importance Selected by RFECV for {model_type} model of {var}")
         plt.show()
 
-    def prediction_intervals(self, X_combined, y_combined, X_test, epsilon, model_type, repeats):
+    def prediction_intervals_non_adapt(self, X_combined, y_combined, X_test, epsilon, model_type, repeats):
+
+        """
+        Method that calculates the prediction intervals for the specified model type using the MAPIE library, which implements conformal prediction methods. It reads the trained model from the saved models folder, fits a CrossConformalRegressor with the best estimator from the grid search, and then predicts the point estimates and prediction intervals for the test set. Finally, it exponentiates the predictions and intervals to transform them back to the original scale of relative risk, and returns the point predictions (the mean) along with the lower and upper bounds of the prediction intervals.
+
+        Parameters
+        ----
+        X_combined: dataframe
+            dataframe with the features for the combined train and validation set
+        
+        y_combined: pandas Series
+            pandas Series with the target variable (relative risk) for the combined train and validation set, log-transformed and with epsilon added
+        
+        X_test: dataframe
+            dataframe with the features for the test set
+        
+        epsilon: float
+            the small value that was added to the relative risk before log-transforming it, to avoid issues with zero values. This value is subtracted from the predictions and intervals after exponentiating them, to transform them back to the original scale of relative risk.
+        
+        model_type: str
+            the type of model for which to calculate the prediction intervals (options: "rf", "xgb", "hrf", "hxgb")
+        
+        pds: PredefinedSplit
+            the predefined split object that specifies which data points belong to train and which to validation, to be used for fitting the CrossConformalRegressor.
+
+        Returns
+        ----
+            y_pred_point: numpy.ndarray
+                array-like with the point predictions (the mean) for the test set, exponentiated and with epsilon subtracted to transform them back to the original scale of relative risk.
+
+            lower_bound: numpy.ndarray
+                array-like with the lower bound of the prediction intervals for the test set, exponentiated and with epsilon subtracted to transform them back to the original scale of relative risk. 
+            
+            upper_bound: numpy.ndarray
+                array-like with the upper bound of the prediction intervals for the test set, exponentiated and with epsilon subtracted to transform them back to the original scale of relative risk.
+        """
+
+        # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
+        try:
+            grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
+        except: 
+            grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
+
+        best_rf = grid.best_estimator_
+
+        cv_mapiets = BlockBootstrap(
+            n_resamplings=repeats, length = 52, overlapping=True, random_state=42
+        )
+
+        mapie_reg = TimeSeriesRegressor(
+            best_rf, method="enbpi", cv=cv_mapiets, agg_function="mean", n_jobs=-1, random_state = 42
+        )
+
+        mapie_reg.fit(X_combined, y_combined)
+
+        y_pred_cp, y_interval = mapie_reg.predict(X_test, ensemble = True, confidence_level = 0.95)
+
+        lower_bound = np.exp(y_interval[:, 0, 0]) - epsilon
+        upper_bound = np.exp(y_interval[:, 1, 0]) - epsilon
+
+        y_pred_point = np.exp(y_pred_cp) - epsilon
+
+        return y_pred_point, lower_bound, upper_bound
+    
+    def prediction_intervals_adaptive(self, X_combined, y_combined, X_test, y_test, epsilon, model_type, repeats):
 
         """
         Method that calculates the prediction intervals for the specified model type using the MAPIE library, which implements conformal prediction methods. It reads the trained model from the saved models folder, fits a CrossConformalRegressor with the best estimator from the grid search, and then predicts the point estimates and prediction intervals for the test set. Finally, it exponentiates the predictions and intervals to transform them back to the original scale of relative risk, and returns the point predictions (the mean) along with the lower and upper bounds of the prediction intervals.
@@ -584,10 +652,6 @@ class Model:
 
         best_model = grid_reg.best_estimator_
 
-        cv_mapiets = BlockBootstrap(
-            n_resamplings=repeats, length = 12, overlapping=True, random_state=42
-        )
-
         if model_type == "hrf" or model_type == "hxgb":
             try:
                 grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
@@ -617,18 +681,60 @@ class Model:
                     epsilon = epsilon
                 )
 
-        mapie_reg = TimeSeriesRegressor(
-            best_model, method="enbpi", cv=cv_mapiets, agg_function="mean", n_jobs=-1, random_state = 42
+        iteration_max = 10
+        alpha = 0.05
+        gamma = 0.005
+        
+        cv_mapiets = BlockBootstrap(
+            n_resamplings=repeats,
+            length=52,
+            overlapping=False,
+            random_state=42,
         )
-
-        mapie_reg.fit(X_combined, y_combined)
-
-        y_pred_cp, y_interval = mapie_reg.predict(X_test, ensemble = True, confidence_level = 0.95)
-
-        lower_bound = np.exp(y_interval[:, 0, 0]) - epsilon
-        upper_bound = np.exp(y_interval[:, 1, 0]) - epsilon
-
-        y_pred_point = np.exp(y_pred_cp) - epsilon
+        
+        mapie_aci = TimeSeriesRegressor(
+            best_model,
+            method="aci",
+            agg_function="mean",
+            conformity_score=AbsoluteConformityScore(sym=True),
+            cv=cv_mapiets,
+            random_state=42,
+            n_jobs=-1
+        )
+        
+        X = pd.concat([X_combined, X_test]).reset_index(drop=True)
+        Y = pd.concat([y_combined, y_test]).reset_index(drop=True)
+        
+        n_steps = len(X_test)
+        y_pred_aci_pfit = np.zeros(n_steps)
+        y_pis_aci_pfit = np.zeros((n_steps, 2, 1))
+        
+        for i in range(n_steps):
+            x_train = np.array(X.iloc[i : len(X_combined) + i])
+            x_test = np.array(X.iloc[[len(X_combined) + i]])
+            y_train = np.array(Y.iloc[i : len(X_combined) + i])
+            y_test_i = np.array(Y.iloc[[len(X_combined) + i]])
+        
+            mapie_aci = mapie_aci.fit(x_train, y_train)
+        
+            y_pred_aci_pfit[i : i + 1], y_pis_aci_pfit[i : i + 1] = mapie_aci.predict(
+                x_test,
+                confidence_level=1 - alpha,
+                ensemble=False,
+                optimize_beta=False,
+            )
+        
+            mapie_aci.adapt_conformal_inference(
+                x_test,
+                y_test_i,
+                gamma=gamma,
+                ensemble=False,
+                optimize_beta=False,
+            )
+        
+        lower_bound = np.exp(y_pis_aci_pfit[:, 0, 0]) - epsilon
+        upper_bound = np.exp(y_pis_aci_pfit[:, 1, 0]) - epsilon
+        y_pred_point = np.exp(y_pred_aci_pfit) - epsilon
 
         return y_pred_point, lower_bound, upper_bound
 
@@ -1027,7 +1133,7 @@ class Model:
                 tick.tick2line.set_visible(False)
                 tick.gridline.set_visible(False) 
 
-    def calculate_nrmse(self, model_type, epsilon):
+    def calculate_nrmse(self, model_type, epsilon, full_particular = None):
 
         """
         Method that calculates the NRMSE for the predictions from a model of a certain type, using the class instance canton.
@@ -1045,8 +1151,12 @@ class Model:
             nrmse: float
                 the calculated NRMSE
         """
-                
-        results = pd.read_csv(f'../../data/model_results/results_{model_type}_{self.canton}.csv')
+        if full_particular == None:
+            results = pd.read_csv(f'../../data/model_results/results_{model_type}_{self.canton}.csv')
+        else:
+            results = pd.read_csv(f'../../data/model_results/results_{model_type}_full.csv')
+            results = results[results["week_canton"].str.contains(full_particular)]
+            print(len(results))
 
         rmse = root_mean_squared_error(results["actual"], results["pred"])
 
