@@ -15,93 +15,12 @@ from sklearn.model_selection import GridSearchCV, PredefinedSplit, TimeSeriesSpl
 from xgboost import XGBClassifier, XGBRegressor
 import joblib
 from sklearn.inspection import permutation_importance
-from sklearn.feature_selection import RFECV
 from arch.bootstrap import IIDBootstrap
 from mapie.regression import TimeSeriesRegressor
 from mapie.subsample import BlockBootstrap
-from sklearn.base import clone, BaseEstimator, RegressorMixin
 from mapie.conformity_scores import AbsoluteConformityScore
 from mapie.subsample import BlockBootstrap
-from scipy.stats import norm, entropy
-from sklearn.base import clone
-
-class Hybrid(BaseEstimator, RegressorMixin):
-
-    def __init__(self, classifier, regressor, threshold, epsilon):
-        self.classifier = classifier
-        self.regressor = regressor
-        self.threshold = threshold
-        self.epsilon = epsilon
-
-    def fit(self, X, y):
-        y_actual = np.exp(y) - self.epsilon
-        y_binary = (y_actual > 0).astype(int)
-
-        self.classifier_ = None if self.classifier is None else clone(self.classifier)
-        self.regressor_ = clone(self.regressor)
-
-        if self.classifier_ is not None:
-
-            unique_classes = np.unique(y_binary)
-
-            if len(unique_classes) < 2:
-                self.single_class_ = unique_classes[0]
-
-            else:
-                self.single_class_ = None
-                self.classifier_.fit(X, y_binary)
-
-        else:
-            self.single_class_ = None
-
-        mask = y_binary == 1
-
-        if mask.sum() == 0:
-            self.no_positive_cases_ = True
-            return self
-
-        self.no_positive_cases_ = False
-
-        self.regressor_.fit(X[mask], y[mask])
-        return self
-
-    def predict(self, X):
-
-        reg = getattr(self, "regressor_", self.regressor)
-        clf = getattr(self, "classifier_", self.classifier)
-
-        if getattr(self, "no_positive_cases_", False):
-            return np.full(len(X), np.log(self.epsilon))
-
-        if getattr(self, "single_class_", None) == 0:
-            return np.full(len(X), np.log(self.epsilon))
-
-        reg_pred = reg.predict(X)
-
-        if getattr(self, "single_class_", None) == 1:
-            return reg_pred
-
-        if clf is None:
-            return reg_pred
-
-        probs = clf.predict_proba(X)[:, 1]
-
-        return np.where(probs >= self.threshold, reg_pred, np.log(self.epsilon))
-
-    @property
-    def feature_importances_(self):
-
-        reg_imp = self.regressor_.feature_importances_
-
-        if (
-            self.classifier_ is None
-            or getattr(self, "single_class_", None) is not None
-        ):
-            return reg_imp
-
-        class_imp = self.classifier_.feature_importances_
-
-        return (reg_imp + class_imp) / 2
+import time
 
 class Model:
 
@@ -311,7 +230,7 @@ class Model:
         ----
             Nothing, just shows the plot with the time series of actual and predicted relative risk values for the test set, including the confidence intervals for the predictions.
         """
-        results = pd.read_csv(f'../../data/model_results/results_{model_type}_{self.canton}.csv')
+        results = pd.read_csv(f'../data/model_results/results_{model_type}_{self.canton}.csv')
         
         results['week_canton'] = results['week_canton'].str.extract(r'(\d{4}-\d+)').iloc[:, 0].tolist()
 
@@ -342,7 +261,7 @@ class Model:
         return -1 * (root_mean_squared_error(y_true, y_pred)) ** 2
  
     
-    def var_importance(self, X_combined, y_combined, X_test, y_test, model_type, epsilon, repeats, var = "RR"):
+    def var_importance(self, X_test, y_test, model_type, repeats = 100, var = "RR"):
 
         """
         Method that calculates and plots the permutation importance of the features for the specified model type, using the test set. It reads the trained model from the saved models folder, calculates the permutation importance using the sklearn function, and then creates a horizontal bar plot with the importance scores for the top 10 features.
@@ -365,29 +284,30 @@ class Model:
             imp_df: dataframe
                 dataframe with the features, their importance scores, and their standard deviation, sorted by importance score in descending order.
         """
+        start = time.perf_counter()
 
         # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
         try:
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
+            grid_reg = joblib.load(f'../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except FileNotFoundError: 
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
+            grid_reg = joblib.load(f'../models/saved_models/{model_type}_{self.canton}.joblib')
         
         regressor = grid_reg.best_estimator_
 
         if model_type == "hrf" or model_type == "hxgb":
             try:
-                grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
+                grid_classi = joblib.load(f'../models/saved_models/{model_type}_classi_{self.canton}.joblib')
             except FileNotFoundError:
                 grid_classi = None
         
             if self.canton == "full":
-                thresholds = pd.read_csv(f"../../data/model_results/thresholds/full_threshold_{model_type}.csv")
+                thresholds = pd.read_csv(f"../data/model_results/thresholds/full_threshold_{model_type}.csv")
                 thresholds["canton"] = thresholds["canton"].astype(str)
                 best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
                 classifier = None if grid_classi is None else grid_classi.best_estimator_
                 regressor = grid_reg.best_estimator_
             else: 
-                thresholds = pd.read_csv(f"../../data/model_results/thresholds/thresholds_{model_type}.csv")
+                thresholds = pd.read_csv(f"../data/model_results/thresholds/thresholds_{model_type}.csv")
                 thresholds["canton"] = thresholds["canton"].astype(str)
                 best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
                 classifier = None if grid_classi is None else grid_classi.best_estimator_
@@ -430,328 +350,11 @@ class Model:
         fig.suptitle(f"{model_type} regression permutation importance for {var} in {self.canton}")
         plt.show()
 
+        end = time.perf_counter()
+
+        print(f"Elapsed time: {end - start:.2f} seconds")
+
         return imp_df
-
-    def rfecv_selection(self, model_type, X_combined, y_combined, X_test, y_test, pds, epsilon, repeats, var = "RR"):
-
-        """ 
-        Method that performs Recursive Feature Elimination with Cross-Validation (RFECV) to select the most important features for the specified model type, using the combined train and validation set. It reads the trained model from the saved models folder, performs RFECV to select the optimal number of features, and then fits a new model with only the selected features. Finally, it calculates the NRMSE for the test set using the new model and plots the feature importance for the selected features.
-
-        Parameters
-        ----
-        model_type: str 
-            the type of model for which to perform RFECV and feature selection (options: "rf", "xgb", "hrf", "hxgb")
-
-        X_combined: dataframe
-            dataframe with the features for the combined train and validation set
-
-        y_combined: pandas Series
-            pandas Series with the target variable (relative risk) for the combined train and validation set, log-transformed and with epsilon added
-        
-        X_test: dataframe
-            dataframe with the features for the test set 
-        
-        y_test: pandas Series
-            pandas Series with the target variable (relative risk) for the test set, log-transformed and with epsilon added
-
-        pds: PredefinedSplit
-            the predefined split object that specifies which data points belong to train and which to validation, to be used for RFECV.
-
-        epsilon: float
-            number used to transform the target variable, that is used here to transform the mean in case that it's zero when calculating NRMSE
-        
-        repeats: int
-            the number of times to permute a feature for calculating the permutation importance, to be used as the n_repeats parameter in the sklearn function permutation_importance when calculating the feature importance for the selected features after performing RFECV.
-
-        var: str
-            the name of the target variable for which to perform RFECV and feature selection, to be used in the title of the plots. the default value is "RR" for relative risk.
-
-        Returns
-        ----
-            Nothing, but it prints the optimal number of features selected by RFECV, the names of the selected features, and the new NRMSE for the test set using only the selected features. It also shows a plot with the RFECV score vs number of features, including a vertical line indicating the optimal number of features, and a horizontal bar plot with the feature importance for the selected features.
-        """
-
-        # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
-        try:
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
-        except FileNotFoundError: 
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
-        
-        model = grid_reg.best_estimator_
-
-        if model_type == "hrf" or model_type == "hxgb":
-            try:
-                grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
-            except FileNotFoundError: 
-                grid_classi = None
-
-            if self.canton == "full":
-                thresholds = pd.read_csv(f"../../data/model_results/thresholds/full_threshold_{model_type}.csv")
-                thresholds["canton"] = thresholds["canton"].astype(str)
-                best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
-                classifier = None if grid_classi is None else grid_classi.best_estimator_
-                model = Hybrid(
-                    classifier= classifier,
-                    regressor= grid_reg.best_estimator_,
-                    threshold= best_threshold,
-                    epsilon = epsilon
-                )
-            else: 
-                thresholds = pd.read_csv(f"../../data/model_results/thresholds/thresholds_{model_type}.csv")
-                thresholds["canton"] = thresholds["canton"].astype(str)
-                best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
-                classifier = None if grid_classi is None else grid_classi.best_estimator_
-                model = Hybrid(
-                    classifier= classifier,
-                    regressor= grid_reg.best_estimator_,
-                    threshold= best_threshold,
-                    epsilon = epsilon
-                )
-
-        rfecv = RFECV(
-            estimator=model,
-            step=1,
-            cv=pds,
-            min_features_to_select=5,
-            n_jobs=-1,
-            scoring='neg_mean_squared_error'
-        )
-
-        rfecv.fit(X_combined, y_combined)
-
-        selected_mask = rfecv.support_ # boolean mask of selected features
-        selected_features = X_combined.columns[selected_mask].tolist()
-
-        print(f'Optimal number of features for {var} and {model_type}: {rfecv.n_features_}')
-        print(f'Selected features: {selected_features}')
-
-        # The cv_results_ dictionary may not always include the "n_features" key, depending on the version of sklearn and the specific estimator used. If it is not present, we can create a range of feature numbers based on the minimum number of features to select and the length of the mean_test_score array. This is used for plotting the RFECV score vs number of features, as the x-axis needs to represent the number of features selected at each step of the RFECV process.
-        if "n_features" in rfecv.cv_results_:
-            n_features_range = rfecv.cv_results_["n_features"]
-        else:
-            n_features_range = range(
-                rfecv.min_features_to_select,
-                rfecv.min_features_to_select + len(rfecv.cv_results_["mean_test_score"]) # This is used because the number of features is the minimum + the number of steps taken after the minimum features to select up until the total features
-            )
-
-        fig, ax = plt.subplots(figsize=(9, 4))
-        ax.plot(n_features_range, rfecv.cv_results_['mean_test_score'], linewidth=2, marker='o', markersize=4)
-        ax.fill_between( # Create shaded area for the standard deviation around the mean test score, to visualize the variability of the scores across the different folds of the cross-validation for each number of features selected.
-            n_features_range,
-            rfecv.cv_results_['mean_test_score'] - rfecv.cv_results_['std_test_score'],
-            rfecv.cv_results_['mean_test_score'] + rfecv.cv_results_['std_test_score'],
-            alpha=0.2
-        )
-        ax.axvline(rfecv.n_features_, linestyle='--', linewidth=2,
-                label=f'Optimal: {rfecv.n_features_} features') # Add vertical line to indicate the optimal number of features selected by RFECV, with a label showing the number of features.
-        ax.set_title(f'RFECV score vs Number of Features {var} and {model_type}', pad=10)
-        ax.set_xlabel('Number of Features Selected')
-        ax.set_ylabel('Cross-Validated score')
-        ax.legend()
-        plt.tight_layout()
-        plt.show()
-
-        final_model = clone(model) # Clone the original model to create a new model that we will fit with only the selected features, to avoid modifying the original model that was trained with all features. 
-        final_model.fit(X_combined[selected_features], y_combined)
-
-        final_model_pred = final_model.predict(X_test[selected_features])
-
-        y_test_actual = np.exp(y_test) - epsilon
-        final_model_pred = np.exp(final_model_pred) - epsilon
-        
-        rmse = root_mean_squared_error(y_test_actual, final_model_pred)
-
-        nrmse = rmse / (np.mean(y_test_actual) + epsilon)
-
-        print(f"New NRMSE with selected features: {nrmse:.4f}")
-        
-        importance_scores = permutation_importance(final_model, X_test[selected_features], y_test, n_repeats=repeats, random_state=42, scoring='neg_mean_squared_error', n_jobs = -1).importances_mean
-
-        df_importance = pd.DataFrame({'Feature': selected_features, 'Importance': importance_scores})
-        df_importance = df_importance.sort_values(by='Importance', ascending=True)
-
-        df_importance.plot(kind='barh', x='Feature', y='Importance', legend=False,
-        figsize=(8, max(4, 0.35 * len(df_importance))))
-        plt.title(f"Feature Importance Selected by RFECV for {model_type} model of {var}")
-        plt.show()
-
-    def prediction_intervals_not_adaptive(self, X_combined, y_combined, X_test, epsilon, model_type, repeats):
-
-        """
-        Method that calculates the prediction intervals for the specified model type using the MAPIE library, which implements conformal prediction methods. It reads the trained model from the saved models folder, fits a CrossConformalRegressor with the best estimator from the grid search, and then predicts the point estimates and prediction intervals for the test set. Finally, it exponentiates the predictions and intervals to transform them back to the original scale of relative risk, and returns the point predictions (the mean) along with the lower and upper bounds of the prediction intervals.
-
-        Parameters
-        ----
-        X_combined: dataframe
-            dataframe with the features for the combined train and validation set
-        
-        y_combined: pandas Series
-            pandas Series with the target variable (relative risk) for the combined train and validation set, log-transformed and with epsilon added
-        
-        X_test: dataframe
-            dataframe with the features for the test set
-        
-        epsilon: float
-            the small value that was added to the relative risk before log-transforming it, to avoid issues with zero values. This value is subtracted from the predictions and intervals after exponentiating them, to transform them back to the original scale of relative risk.
-        
-        model_type: str
-            the type of model for which to calculate the prediction intervals (options: "rf", "xgb", "hrf", "hxgb")
-        
-        pds: PredefinedSplit
-            the predefined split object that specifies which data points belong to train and which to validation, to be used for fitting the CrossConformalRegressor.
-
-        Returns
-        ----
-            y_pred_point: numpy.ndarray
-                array-like with the point predictions (the mean) for the test set, exponentiated and with epsilon subtracted to transform them back to the original scale of relative risk.
-
-            lower_bound: numpy.ndarray
-                array-like with the lower bound of the prediction intervals for the test set, exponentiated and with epsilon subtracted to transform them back to the original scale of relative risk. 
-            
-            upper_bound: numpy.ndarray
-                array-like with the upper bound of the prediction intervals for the test set, exponentiated and with epsilon subtracted to transform them back to the original scale of relative risk.
-        """
-
-        # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
-        try:
-            grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
-        except: 
-            grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
-
-        best_rf = grid.best_estimator_
-
-        cv_mapiets = BlockBootstrap(
-            n_resamplings=repeats, length = 1, random_state=42
-        )
-
-        mapie_reg = TimeSeriesRegressor(
-            best_rf, method="enbpi", cv=cv_mapiets, agg_function="mean", n_jobs=-1, random_state = 42
-        )
-
-        mapie_reg.fit(X_combined, y_combined)
-
-        y_pred_cp, y_interval = mapie_reg.predict(X_test, ensemble = True, confidence_level = 0.95)
-
-        lower_bound = np.exp(y_interval[:, 0, 0]) - epsilon
-        upper_bound = np.exp(y_interval[:, 1, 0]) - epsilon
-
-        y_pred_point = np.exp(y_pred_cp) - epsilon
-
-        return y_pred_point, lower_bound, upper_bound
-
-    def prediction_intervals_split(self,
-        model_type,
-        X_combined,
-        y_combined,
-        X_test,
-        epsilon,
-        alpha=0.05,
-        symmetric=True,
-    ):
-        """
-        Split Conformal Prediction.
-
-        Parameters
-        ----------
-        model : sklearn estimator
-            Unfitted estimator.
-
-        X_train, y_train
-            Training data.
-
-        X_cal, y_cal
-            Calibration data (your validation set).
-
-        X_test
-            Test predictors.
-
-        epsilon : float
-            Constant added before log-transform.
-
-        alpha : float
-            Miscoverage level (0.05 -> 95% interval).
-
-        symmetric : bool
-            True  -> |residual| conformity score
-            False -> asymmetric residual quantiles
-
-        Returns
-        -------
-        y_pred
-        lower
-        upper
-        """
-        try:
-            grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
-        except: 
-            grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
-
-        X_train = X_combined.iloc[0:201, :]
-        y_train = y_combined[0:201]
-    
-        X_cal = X_combined.iloc[201:252, :]
-        y_cal = y_combined[201:252]
-
-        best_model = grid.best_estimator_
-
-        X_train = X_train.to_numpy(dtype=np.float32)
-        y_train = np.asarray(y_train)
-        X_cal = X_cal.to_numpy(dtype=np.float32)
-        X_test = X_test.to_numpy(dtype=np.float32)
-        # Clone so the original estimator is unchanged
-        model = clone(best_model)
-
-        # Fit only on the training set
-        model.fit(X_train, y_train)
-
-        # Calibration predictions
-        pred_cal = model.predict(X_cal)
-
-        if symmetric:
-
-            # Absolute residuals
-            scores = np.abs(y_cal - pred_cal)
-
-            # Finite-sample conformal quantile
-            n = len(scores)
-            q = np.quantile(
-                scores,
-                np.ceil((n + 1) * (1 - alpha)) / n,
-                method="higher",
-            )
-
-            pred_test = model.predict(X_test)
-
-            lower = pred_test - q
-            upper = pred_test + q
-
-        else:
-
-            residuals = y_cal - pred_cal
-
-            lower_shift = np.quantile(
-                residuals,
-                alpha / 2,
-                method="higher",
-            )
-
-            upper_shift = np.quantile(
-                residuals,
-                1 - alpha / 2,
-                method="higher",
-            )
-
-            pred_test = model.predict(X_test)
-
-            lower = pred_test + lower_shift
-            upper = pred_test + upper_shift
-
-        # Back-transform from log scale
-        y_pred = np.exp(pred_test) - epsilon
-        lower = np.exp(lower) - epsilon
-        upper = np.exp(upper) - epsilon
-
-        return y_pred, lower, upper
 
     def prediction_intervals_aci(self,
         model_type,
@@ -762,7 +365,8 @@ class Model:
         epsilon,
         alpha=0.05,
         gamma=0.005,
-        n_resamplings=50,
+        n_resamplings=100,
+        full = True
     ):
         """
         Adaptive Conformal Inference (ACI) prediction intervals.
@@ -784,19 +388,26 @@ class Model:
         upper : upper prediction interval
         """
 
-        try:
-            grid = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
-        except: 
-            grid = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
+        start = time.perf_counter()
 
-        best_rf = grid.best_estimator_
+        if full:
+            try:
+                grid = joblib.load(f'../models/saved_models/{model_type}_reg_full.joblib')
+            except: 
+                grid = joblib.load(f'../models/saved_models/{model_type}_full.joblib')
+        else:
+            try:
+                grid = joblib.load(f'../models/saved_models/{model_type}_reg_{self.canton}.joblib')
+            except: 
+                grid = joblib.load(f'../models/saved_models/{model_type}_{self.canton}.joblib')
+
+        best_reg = grid.best_estimator_
 
         X_train = X_train.to_numpy(dtype=np.float32)
         X_test = X_test.to_numpy(dtype=np.float32)
         y_train = np.asarray(y_train)
         y_test = np.asarray(y_test)
 
-        # Bootstrap used by EnbPI/ACI
         cv = BlockBootstrap(
             n_resamplings=n_resamplings,
             length=1,
@@ -804,9 +415,8 @@ class Model:
             random_state=42,
         )
 
-        # MAPIE ACI model
         mapie = TimeSeriesRegressor(
-            estimator=best_rf,
+            estimator=best_reg,
             method="aci",
             cv=cv,
             conformity_score=AbsoluteConformityScore(sym=True),
@@ -821,7 +431,6 @@ class Model:
         lower = []
         upper = []
 
-        # Sequential forecasting
         for x, y in zip(X_test, y_test):
 
             pred, interval = mapie.predict(
@@ -835,7 +444,6 @@ class Model:
             lower.append(interval[0, 0, 0])
             upper.append(interval[0, 1, 0])
 
-            # Update conformity scores with the newly observed value
             mapie.adapt_conformal_inference(
                 x.reshape(1, -1),
                 np.array([y]),
@@ -848,127 +456,15 @@ class Model:
         lower = np.exp(lower) - epsilon
         upper = np.exp(upper) - epsilon
 
+        end = time.perf_counter()
+        
+        print(f"Elapsed time: {end - start:.2f} seconds")
+
         return (
             np.asarray(predictions),
             np.asarray(lower),
             np.asarray(upper),
         )
-    
-    def prediction_intervals_adaptive(self, X_combined, y_combined, X_test, y_test,
-                                    epsilon, model_type, repeats):
-        try:
-            grid_reg = joblib.load(
-                f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib'
-            )
-        except:
-            grid_reg = joblib.load(
-                f'../../models/saved_models/{model_type}_{self.canton}.joblib'
-            )
-
-        best_model = grid_reg.best_estimator_
-
-        if model_type in ["hrf", "hxgb"]:
-
-            try:
-                grid_classi = joblib.load(
-                    f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib'
-                )
-            except:
-                grid_classi = None
-
-            if self.canton == "full":
-                thresholds = pd.read_csv(
-                    f"../../data/model_results/thresholds/full_threshold_{model_type}.csv"
-                )
-            else:
-                thresholds = pd.read_csv(
-                    f"../../data/model_results/thresholds/thresholds_{model_type}.csv"
-                )
-
-            thresholds["canton"] = thresholds["canton"].astype(str)
-
-            best_threshold = thresholds[
-                thresholds["canton"] == self.canton
-            ]["best_th"].values[0]
-
-            classifier = None if grid_classi is None else grid_classi.best_estimator_
-
-            best_model = Hybrid(
-                classifier=classifier,
-                regressor=grid_reg.best_estimator_,
-                threshold=best_threshold,
-                epsilon=epsilon
-            )
-
-        alpha = 0.05
-        gamma = 0.005
-
-        cv_mapiets = BlockBootstrap(
-            n_resamplings=repeats,
-            length=1,
-            overlapping=False,
-            random_state=42
-        )
-
-        mapie_aci = TimeSeriesRegressor(
-            estimator=best_model,
-            method="aci",
-            cv=cv_mapiets,
-            agg_function="mean",
-            conformity_score=AbsoluteConformityScore(sym=True),
-            random_state=42,
-            n_jobs=-1
-        )
-
-        X_train_np = X_combined.to_numpy(dtype=np.float32)
-        y_train_np = y_combined.to_numpy(dtype=np.float64)
-
-        X_test_np = X_test.to_numpy(dtype=np.float32)
-        y_test_np = y_test.to_numpy(dtype=np.float64)
-
-        mapie_aci.fit(X_train_np, y_train_np)
-
-        pred = best_model.predict(X_combined)
-        res = np.abs(y_combined - pred)
-
-        print(np.percentile(res,[50,75,90,95,99]))
-
-        n_steps = len(X_test_np)
-
-        y_pred_aci = np.zeros(n_steps)
-        y_pis_aci = np.zeros((n_steps, 2, 1))
-
-        for i in range(n_steps):
-
-            x_i = X_test_np[i:i+1]
-            y_i = y_test_np[i:i+1]
-
-            pred, pi = mapie_aci.predict(
-                x_i,
-                confidence_level=1 - alpha,
-                ensemble=True,
-                optimize_beta=False
-            )
-
-            y_pred_aci[i] = pred[0]
-            y_pis_aci[i] = pi[0]
-
-            mapie_aci.adapt_conformal_inference(
-                x_i,
-                y_i,
-                gamma=gamma,
-                ensemble=True,
-                optimize_beta=False
-            )
-
-        lower_bound = np.exp(y_pis_aci[:, 0, 0]) - epsilon
-        upper_bound = np.exp(y_pis_aci[:, 1, 0]) - epsilon
-        y_pred_point = np.exp(y_pred_aci) - epsilon
-
-        print(np.percentile(mapie_aci.conformity_scores_,
-                    [50,75,90,95,99]))
-
-        return y_pred_point, lower_bound, upper_bound
     
     def rf_reg(self, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
 
@@ -1003,6 +499,8 @@ class Model:
             Nothing, but it saves the model results and the trained model, and prints when it is ready.
         """
 
+        start = time.perf_counter()
+
         rf = RandomForestRegressor(oob_score=True, random_state=42)
 
         param_grid_rf = {
@@ -1030,11 +528,19 @@ class Model:
               "week_canton": test["week_canton"].values
         })
 
-        results_rf.to_csv(f'../../data/model_results/results_rf_{self.canton}.csv')
+        results_rf.to_csv(f'../data/model_results/results_rf_{self.canton}.csv')
 
-        joblib.dump(grid_rf, f'../../models/saved_models/rf_{self.canton}.joblib')
+        joblib.dump(grid_rf, f'../models/saved_models/rf_{self.canton}.joblib')
 
         print(f"RF Model Ready for {self.canton}")
+
+        end = time.perf_counter()
+        
+        print(f"Elapsed time: {end - start:.2f} seconds")
+
+        elapsed_time = end - start
+
+        return elapsed_time
 
     def xgb_reg(self, X_combined, y_combined, X_test, y_test, test, pds, epsilon):
 
@@ -1068,6 +574,7 @@ class Model:
         ----
             Nothing, but it saves the model results and the trained model, and prints when it is ready.
         """
+        start = time.perf_counter()
 
         xgb = XGBRegressor(random_state=42)
 
@@ -1097,11 +604,19 @@ class Model:
             "week_canton": test["week_canton"].values
         })
 
-        results_xgb.to_csv(f'../../data/model_results/results_xgb_{self.canton}.csv')
+        results_xgb.to_csv(f'../data/model_results/results_xgb_{self.canton}.csv')
 
-        joblib.dump(grid_xgb, f'../../models/saved_models/xgb_{self.canton}.joblib')
+        joblib.dump(grid_xgb, f'../models/saved_models/xgb_{self.canton}.joblib')
 
         print(f"XGB Model Ready for {self.canton}")
+
+        end = time.perf_counter()
+        
+        print(f"Elapsed time: {end - start:.2f} seconds")
+
+        elapsed_time = end - start
+        
+        return elapsed_time
 
     def hybrid(self, model_type, X_combined, y_combined, X_train, X_test, y_test, test, pds, epsilon):
 
@@ -1142,6 +657,7 @@ class Model:
             best_threshold: float
                 return the best threshold so that i can be saved to calculate intervals
         """
+        start = time.perf_counter()
 
         X_combined = X_combined.reset_index(drop=True)
         X_test = X_test.reset_index(drop=True)
@@ -1204,8 +720,8 @@ class Model:
             })
 
             results.to_csv(
-                f"../../data/model_results/results_{model_type}_{self.canton}.csv",
-                index=False
+                 f"../data/model_results/results_{model_type}_{self.canton}.csv",
+                 index=False
             )
 
             print(f"{model_type} ready for {self.canton}")
@@ -1328,17 +844,23 @@ class Model:
             "week_canton": test["week_canton"].values
         })
 
-        results.to_csv(f"../../data/model_results/results_{model_type}_{self.canton}.csv", index=False)
+        results.to_csv(f"../data/model_results/results_{model_type}_{self.canton}.csv", index=False)
 
         # Only save classification model if the classification step was not skipped due to only one class being present in test set
         if grid_classi != None:
-            joblib.dump(grid_classi, f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
+             joblib.dump(grid_classi, f'../models/saved_models/{model_type}_classi_{self.canton}.joblib')
 
-        joblib.dump(grid_reg, f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
+        joblib.dump(grid_reg, f'../models/saved_models/{model_type}_reg_{self.canton}.joblib')
 
         print(f"{model_type} ready for {self.canton}")
 
-        return best_threshold
+        end = time.perf_counter()
+
+        elapsed_time = end - start
+        
+        print(f"Elapsed time: {end - start:.2f} seconds")
+
+        return best_threshold, elapsed_time
 
     def ticks_years_top(self, ax, n):
 
@@ -1369,33 +891,33 @@ class Model:
 
         # Check if there's a classifier model if it's a hybrid model type
         try:
-            grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}.joblib')
+            grid_classi = joblib.load(f'../models/saved_models/{model_type}_classi_{self.canton}.joblib')
             modelo_classi = grid_classi.best_estimator_
         except FileNotFoundError: 
             grid_classi = None
 
         # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
         try:
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
+            grid_reg = joblib.load(f'../models/saved_models/{model_type}_reg_{self.canton}.joblib')
             modelo_reg = grid_reg.best_estimator_
         except FileNotFoundError: 
-                grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
+                grid_reg = joblib.load(f'../models/saved_models/{model_type}_{self.canton}.joblib')
                 modelo_reg = grid_reg.best_estimator_
 
         if model_type == "hrf":
             if self.canton == "full":
-                thresholds = pd.read_csv(f"../../data/model_results/thresholds/full_threshold_hrf.csv")
+                thresholds = pd.read_csv(f"../data/model_results/thresholds/full_threshold_hrf.csv")
                 thresholds["canton"] = thresholds["canton"].astype(str)
             else: 
-                thresholds = pd.read_csv(f"../../data/model_results/thresholds/thresholds_hrf.csv")
+                thresholds = pd.read_csv(f"../data/model_results/thresholds/thresholds_hrf.csv")
                 thresholds["canton"] = thresholds["canton"].astype(str)
             best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
         elif model_type == "hxgb":
             if self.canton == "full":
-                thresholds = pd.read_csv("../../data/model_results/thresholds/full_threshold_hxgb.csv")
+                thresholds = pd.read_csv("../data/model_results/thresholds/full_threshold_hxgb.csv")
                 thresholds["canton"] = thresholds["canton"].astype(str)
             else: 
-                thresholds = pd.read_csv("../../data/model_results/thresholds/thresholds_hxgb.csv")
+                thresholds = pd.read_csv("../data/model_results/thresholds/thresholds_hxgb.csv")
                 thresholds["canton"] = thresholds["canton"].astype(str)
             best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
 
@@ -1434,7 +956,7 @@ class Model:
                 the calculated NRMSE
         """
         
-        results = pd.read_csv(f'../../data/model_results/results_{model_type}_{self.canton}.csv')
+        results = pd.read_csv(f'../data/model_results/results_{model_type}_{self.canton}.csv')
 
         rmse = root_mean_squared_error(results["actual"], results["pred"])
         
@@ -1442,20 +964,21 @@ class Model:
 
         return self.canton, nrmse
   
-    def confint_nrmse(self, model_type, nrmse_hat, X_combined, y_combined, X_test, y_test, epsilon, which_set, n_bootstraps = 100, alpha = 0.05, dif = False):
+    def confint_nrmse(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, which_set, n_bootstraps = 500):
 
+        start = time.perf_counter()
         # Check if there's a classifier model if it's a hybrid model type
         try:
-            grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_{self.canton}_dif.joblib')
+            grid_classi = joblib.load(f'../models/saved_models/{model_type}_classi_{self.canton}.joblib')
             modelo_classi = grid_classi.best_estimator_
         except FileNotFoundError: 
             grid_classi = None
 
         # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
         try:
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_{self.canton}.joblib')
+            grid_reg = joblib.load(f'../models/saved_models/{model_type}_reg_{self.canton}.joblib')
         except FileNotFoundError: 
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_{self.canton}.joblib')
+            grid_reg = joblib.load(f'../models/saved_models/{model_type}_{self.canton}.joblib')
         
         modelo_reg = grid_reg.best_estimator_
 
@@ -1523,31 +1046,35 @@ class Model:
         lower_bound = np.percentile(nrmse, 2.5)
         upper_bound = np.percentile(nrmse, 97.5)
 
+        end = time.perf_counter()
+        
+        print(f"Elapsed time: {end - start:.2f} seconds")
+
         return self.canton, point, lower_bound, upper_bound
     
-    def calculate_nrmse_full(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, which_set, dif = False):
+    def calculate_nrmse_full(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, which_set):
 
         # Check if there's a classifier model if it's a hybrid model type
         try:
-            grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_full.joblib')
+            grid_classi = joblib.load(f'../models/saved_models/{model_type}_classi_full.joblib')
             modelo_classi = grid_classi.best_estimator_
         except FileNotFoundError: 
             grid_classi = None
 
         # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
         try:
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_full.joblib')
+            grid_reg = joblib.load(f'../models/saved_models/{model_type}_reg_full.joblib')
             modelo_reg = grid_reg.best_estimator_
         except FileNotFoundError: 
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_full.joblib')
+            grid_reg = joblib.load(f'../models/saved_models/{model_type}_full.joblib')
             modelo_reg = grid_reg.best_estimator_
 
         if model_type == "hrf":
-            thresholds = pd.read_csv("../../data/model_results/thresholds/full_threshold_hrf.csv")
+            thresholds = pd.read_csv("../data/model_results/thresholds/full_threshold_hrf.csv")
             thresholds["canton"] = thresholds["canton"].astype(str)
             best_threshold = thresholds[thresholds["canton"] == "full"]["best_th"].values[0]
         elif model_type == "hxgb":
-            thresholds = pd.read_csv("../../data/model_results/thresholds/full_threshold_hxgb.csv")
+            thresholds = pd.read_csv("../data/model_results/thresholds/full_threshold_hxgb.csv")
             thresholds["canton"] = thresholds["canton"].astype(str)
             best_threshold = thresholds[thresholds["canton"] == "full"]["best_th"].values[0]
 
@@ -1574,8 +1101,7 @@ class Model:
         
         if grid_classi is None:
             predictions = modelo_reg.predict(X_eval)
-            if dif == False:
-                predictions = np.exp(predictions) - epsilon
+            predictions = np.exp(predictions) - epsilon
         else:
             y_pred_reg = modelo_reg.predict(X_eval)
             y_pred_reg = np.exp(y_pred_reg) - epsilon
@@ -1589,19 +1115,22 @@ class Model:
 
         return self.canton, nrmse
         
-    def confint_nrmse_full(self, model_type, nrmse_hat, X_combined, y_combined, X_test, y_test, epsilon, which_set, n_bootstraps = 100, alpha = 0.05, dif = False):
-    
+    def confint_nrmse_full(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, which_set, n_bootstraps = 500):
+
+        start = time.perf_counter()
+
         try:
-            grid_classi = joblib.load(f'../../models/saved_models/{model_type}_classi_full.joblib')
+            grid_classi = joblib.load(f'../models/saved_models/{model_type}_classi_full.joblib')
             modelo_classi = grid_classi.best_estimator_
         except FileNotFoundError: 
             grid_classi = None
+            modelo_classi = None
 
         # The file names are different for the regression models (with "_reg" in the name) and the hybrid models (without "_reg" in the name), so we need to try both options when loading the model.
         try:
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_reg_full.joblib')
+            grid_reg = joblib.load(f'../models/saved_models/{model_type}_reg_full.joblib')
         except FileNotFoundError: 
-            grid_reg = joblib.load(f'../../models/saved_models/{model_type}_full.joblib')
+            grid_reg = joblib.load(f'../models/saved_models/{model_type}_full.joblib')
             
         modelo_reg = grid_reg.best_estimator_
 
@@ -1642,11 +1171,11 @@ class Model:
             print("Only one class present in train set for classification. Skipping classification step.")
 
         if model_type == "hrf":
-            thresholds = pd.read_csv("../../data/model_results/thresholds/full_threshold_hrf.csv")
+            thresholds = pd.read_csv("../data/model_results/thresholds/full_threshold_hrf.csv")
             thresholds["canton"] = thresholds["canton"].astype(str)
             best_threshold = thresholds[thresholds["canton"] == "full"]["best_th"].values[0]
         elif model_type == "hxgb":
-            thresholds = pd.read_csv("../../data/model_results/thresholds/full_threshold_hxgb.csv")
+            thresholds = pd.read_csv("../data/model_results/thresholds/full_threshold_hxgb.csv")
             thresholds["canton"] = thresholds["canton"].astype(str)
             best_threshold = thresholds[thresholds["canton"] == "full"]["best_th"].values[0]
     
@@ -1670,5 +1199,9 @@ class Model:
         point = np.mean(nrmse)
         lower_bound = np.percentile(nrmse, 2.5)
         upper_bound = np.percentile(nrmse, 97.5)
+
+        end = time.perf_counter()
+        
+        print(f"Elapsed time: {end - start:.2f} seconds")
     
         return self.canton, point, lower_bound, upper_bound
