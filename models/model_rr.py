@@ -9,6 +9,7 @@ This script contains the Model class used to train and evaluate the different mo
 import pandas as pd
 from sklearn.metrics import root_mean_squared_error, make_scorer
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 import numpy as np
 from sklearn.model_selection import GridSearchCV, PredefinedSplit, TimeSeriesSplit
@@ -213,7 +214,7 @@ class Model:
 
         return X_combined, y_combined, X_train, X_test, y_test, test, pds, epsilon
 
-    def serie_temp_canton(self, model_type, y_pred_point, lower_bound, upper_bound, lims = [0, 7]):
+    def serie_temp_canton(self, model_type, X_combined, y_combined, y_test, lower_bound, upper_bound, epsilon, lims = [0, 7], full = False):
 
         """
         Method that plots the time series of actual and predicted relative risk values for the test set, including the confidence intervals for the predictions. It reads the results from the csv file where they were saved after making predictions with the trained model.
@@ -230,22 +231,39 @@ class Model:
         ----
             Nothing, just shows the plot with the time series of actual and predicted relative risk values for the test set, including the confidence intervals for the predictions.
         """
-        results = pd.read_csv(f'../data/model_results/results_{model_type}_{self.canton}.csv')
+        if full:
+            preds = pd.read_csv(f'../data/model_results/results_{model_type}_full.csv')
+            results = preds[preds["week_canton"].str.contains(self.canton)] 
+        else: 
+            results = pd.read_csv(f'../data/model_results/results_{model_type}_{self.canton}.csv')
+
+        df_copy = self.df.copy()
+
+        df_copy['week_canton'] = df_copy['week_canton'].str.extract(r'(\d{4}-\d+)').iloc[:, 0].tolist()
+
+        y_pred_train = self.calculate_train_predictions(model_type, X_combined, epsilon)
+
+        y_combined = np.exp(y_combined) - epsilon
+        y_test = np.exp(y_test) - epsilon
         
-        results['week_canton'] = results['week_canton'].str.extract(r'(\d{4}-\d+)').iloc[:, 0].tolist()
-
-        fig, ax = plt.subplots()
-        ax.plot(results['week_canton'], results["actual"], label='Real', marker='o', linestyle = "dashed", color = "blue")
-        ax.plot(results['week_canton'], results["pred"], label='Predicted', marker='o', color = "red")
-        ax.plot(results['week_canton'], y_pred_point, label='Conformal predictions', marker='o', color = "green")
-        ax.fill_between(x = results['week_canton'], label = "CI (95%)", y1 = lower_bound, y2 = upper_bound, alpha = 0.2, color = "green")
-        ax.legend(loc = "upper right")
-        self.ticks_years_top(ax, 20)
-        ax.set_xlabel('Week')
-        ax.set_ylabel(f'Relative risk')
+        fig, ax = plt.subplots(figsize=(16, 5))
+        ax.plot(df_copy['week_canton'].iloc[0:len(y_combined)], y_combined, label='Real', marker='o', linestyle = "dashed", color = "#000000", linewidth=4)
+        ax.plot(df_copy['week_canton'].iloc[len(y_combined):], y_test, marker='o', linestyle = "dashed", color = "#000000", linewidth=4)
+        ax.plot(df_copy['week_canton'].iloc[len(y_combined):], results["pred"], label='Predicted', marker='o',linestyle = "solid", color = "#009E73", linewidth=4)
+        ax.plot(df_copy['week_canton'].iloc[0:len(y_combined)], y_pred_train, marker='o', linestyle = "solid", color = "#009E73", linewidth=4)
+        ax.fill_between(x = df_copy['week_canton'].iloc[len(y_combined):], label = "CI (95%)", y1 = lower_bound, y2 = upper_bound, alpha = 0.2, color = "#009E73")
+        ax.legend(loc = "upper right", fontsize = 18)
+        y_ticks = list(range(0, int(np.ceil(lims[1]))))
+        ax.set_yticks(y_ticks)
+        y_labels = [str(tick) if i % 2 == 0 else "" for i, tick in enumerate(y_ticks)]
+        ax.set_yticklabels(y_labels, fontsize=14, fontweight="bold")
+        self.ticks_years_top(ax, 25)
+        ax.set_xlabel('Week', fontweight = "bold", fontsize = 20)
+        ax.set_ylabel(f'Relative risk', fontweight = "bold", fontsize = 20)
         ax.set_ylim(lims)
+        ax.set_xlim([0, 304])
 
-        ax.set_title(f"{model_type} for {self.canton}")
+        # ax.set_title(f"{model_type} for {self.canton}")
         plt.show()
 
     def custom_threshold_score(self, y_true, y_pred_proba, threshold):
@@ -326,12 +344,18 @@ class Model:
                 
                 imp_df_classi = pd.DataFrame({"Feature": X_test.columns, f"imp_{model_type}": r_classi.importances_mean, f"std_{model_type}": r_classi.importances_std}).sort_values(by=f"imp_{model_type}", ascending=False).reset_index(drop=True)
 
-                fig, ax = plt.subplots(figsize=(10, 8))
+                fig, ax = plt.subplots(figsize=(12, 8))
                 imp_df_classi_sorted = imp_df_classi.head(10).sort_values(by=f"imp_{model_type}", ascending=True)
                 ax.barh(imp_df_classi_sorted["Feature"], imp_df_classi_sorted[f"imp_{model_type}"])
-                ax.bar_label(ax.containers[0], fmt='%.2f')
-                ax.set_label("Importance")
-                fig.suptitle(f"{model_type} classification permutation importance for {var} in {self.canton}")
+                ax.tick_params(axis='y', labelsize=14)
+                for label in ax.get_yticklabels():
+                    label.set_fontweight('bold')
+                ax.tick_params(axis='x', labelsize=14)
+                for label in ax.get_xticklabels():
+                    label.set_fontweight('bold')
+                ax.bar_label(ax.containers[0], fmt='%.2e', fontsize = 10, fontweight = "bold")
+                ax.set_xlabel("Importance", fontsize = 20, fontweight = "bold")
+                # fig.suptitle(f"{model_type} classification permutation importance for {var} in {self.canton}")
                 plt.show()
 
             print("Regressor")
@@ -342,12 +366,18 @@ class Model:
 
         print(imp_df)
 
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, ax = plt.subplots(figsize=(12, 8))
         imp_df_sorted = imp_df.head(10).sort_values(by=f"imp_{model_type}", ascending=True)
         ax.barh(imp_df_sorted["Feature"], imp_df_sorted[f"imp_{model_type}"])
-        ax.bar_label(ax.containers[0], fmt='%.2f')
-        ax.set_xlabel("Importance")
-        fig.suptitle(f"{model_type} regression permutation importance for {var} in {self.canton}")
+        ax.tick_params(axis='y', labelsize=14)
+        for label in ax.get_yticklabels():
+            label.set_fontweight('bold')
+        ax.tick_params(axis='x', labelsize=14)
+        for label in ax.get_xticklabels():
+            label.set_fontweight('bold')
+        ax.bar_label(ax.containers[0], fmt='%.2e', fontsize = 10, fontweight = "bold")
+        ax.set_xlabel("Importance", fontsize = 20, fontweight = "bold")
+        # fig.suptitle(f"{model_type} regression permutation importance for {var} in {self.canton}")
         plt.show()
 
         end = time.perf_counter()
@@ -427,7 +457,6 @@ class Model:
 
         mapie.fit(X_train, y_train)
 
-        predictions = []
         lower = []
         upper = []
 
@@ -440,7 +469,6 @@ class Model:
                 optimize_beta=False,
             )
 
-            predictions.append(pred.item())
             lower.append(interval[0, 0, 0])
             upper.append(interval[0, 1, 0])
 
@@ -452,7 +480,6 @@ class Model:
                 optimize_beta=False,
             )
 
-        predictions = np.exp(predictions) - epsilon
         lower = np.exp(lower) - epsilon
         upper = np.exp(upper) - epsilon
 
@@ -461,7 +488,6 @@ class Model:
         print(f"Elapsed time: {end - start:.2f} seconds")
 
         return (
-            np.asarray(predictions),
             np.asarray(lower),
             np.asarray(upper),
         )
@@ -879,16 +905,13 @@ class Model:
         ----
             Nothing, but adds neat ticks to the plot
         """
+        ax.tick_params(axis='x', labelsize=12)
+        for label in ax.get_xticklabels():
+            label.set_fontweight('bold')
 
-        [l.set_visible(False) for (i,l) in enumerate(ax.xaxis.get_ticklabels()) if i % n != 0]
-        for i, tick in enumerate(ax.xaxis.get_major_ticks()):
-            if i % n != 0:
-                tick.tick1line.set_visible(False)
-                tick.tick2line.set_visible(False)
-                tick.gridline.set_visible(False) 
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(n))
 
-    def calculate_train_nrmse(self, model_type, X_combined, y_combined, epsilon):
-
+    def calculate_train_predictions(self, model_type, X_combined, epsilon): 
         # Check if there's a classifier model if it's a hybrid model type
         try:
             grid_classi = joblib.load(f'../models/saved_models/{model_type}_classi_{self.canton}.joblib')
@@ -901,8 +924,8 @@ class Model:
             grid_reg = joblib.load(f'../models/saved_models/{model_type}_reg_{self.canton}.joblib')
             modelo_reg = grid_reg.best_estimator_
         except FileNotFoundError: 
-                grid_reg = joblib.load(f'../models/saved_models/{model_type}_{self.canton}.joblib')
-                modelo_reg = grid_reg.best_estimator_
+            grid_reg = joblib.load(f'../models/saved_models/{model_type}_{self.canton}.joblib')
+            modelo_reg = grid_reg.best_estimator_
 
         if model_type == "hrf":
             if self.canton == "full":
@@ -923,11 +946,18 @@ class Model:
 
         if grid_classi == None:                     
             predictions = modelo_reg.predict(X_combined)
+            predictions = np.exp(predictions) - epsilon
         else: 
             y_pred_reg = modelo_reg.predict(X_combined)
             y_pred_reg = np.exp(y_pred_reg) - epsilon
             prob_classi = modelo_classi.predict_proba(X_combined)[:, 1]
             predictions = np.where(prob_classi < best_threshold, 0, y_pred_reg)
+
+        return predictions
+
+    def calculate_train_nrmse(self, model_type, X_combined, y_combined, epsilon):
+
+        predictions = self.calculate_train_predictions(self, model_type, X_combined, epsilon)
 
         y_true = np.exp(y_combined) - epsilon
 
