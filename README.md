@@ -15,7 +15,7 @@ It contains the following folders:
     + Calculating the lags for each variable.
 
     + One file with in which the relative risk is calculated.
-
-+ data: full curated data used for all computations.
   
 + results: notebooks used to train the models, calculate NRMSE and its bootstrap intervals, and generate tables and figures.
+
++ full_data: full curated data used for all computations.
