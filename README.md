@@ -16,10 +16,6 @@ It contains the following folders:
 
     + One file with in which the relative risk is calculated.
 
-+ data: the processed data used in this repository. It does not contain all the raw downloaded data files because of storage issues. 
-
-    + raw: the first processing step for the data right after downloading it. It also contains the files used for the EDA report. The full CHIRPS and CHIRTS files without weekly aggregated data are in separate folders.
-
-    + interim: it contains the data that is ready for integration in a big dataset. This means it is aggregated weekly and the rows are year-week-canton. It contains a separate folder that contains the weekly lags for each variable (1 to 8 weeks).
-    
-    + clean: the full dataset.
++ data: full curated data used for all computations.
+  
++ results: notebooks used to train the models, calculate NRMSE and its bootstrap intervals, and generate tables and figures.
