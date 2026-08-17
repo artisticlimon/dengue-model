@@ -51,30 +51,27 @@ plot_map <- function(dataset){
   cant_best <- left_join(cantones, best, by = "canton") |> 
     select(c(canton, geometry, best_model)) 
 
-  # Define the bounding box coordinates for the Central Valley zoom area
   cv_xmin <- -84.5
   cv_xmax <- -83.8
   cv_ymin <-  9.8
   cv_ymax <- 10.15
 
-  # Data frame to draw the indicator box on the main map
   zoom_box <- data.frame(
     xmin = cv_xmin, xmax = cv_xmax,
     ymin = cv_ymin, ymax = cv_ymax
   )
 
-  # 1. MAIN NATIONAL MAP
   main_map <- ggplot(cant_best) +
     geom_sf(aes(fill = best_model), color = "white", linewidth = 0.2) +
     geom_sf_text(
         aes(label = canton), 
-        size = 2.8, # Slightly larger since there is no bounding box text frame now            
+        size = 2.8,           
         color = "black", 
         fontface = "bold",
         check_overlap = TRUE
       ) + 
     geom_rect(data = zoom_box, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-              color = "black", fill = NA, linewidth = 0.5, linetype = "dashed") +
+              color = "#F0E442", fill = NA, linewidth = 1.25, linetype = "dashed") +
     coord_sf(xlim = c(-86, -82), ylim = c(8, 11.4), expand = FALSE) +
     scale_fill_manual(name = "Best Model", values = c("#D55E00", "#CC79A7", "#009E73", "#0072B2")) + 
     theme_void() +                                        
@@ -85,12 +82,11 @@ plot_map <- function(dataset){
       legend.position = "right"                           
     )
 
-  # 2. ZOOMED CENTRAL VALLEY INSET
   inset_map <- ggplot(cant_best) +
     geom_sf(aes(fill = best_model), color = "white", size = 0.2) +
     geom_sf_text(
         aes(label = canton), 
-        size = 2.8, # Slightly larger since there is no bounding box text frame now            
+        size = 2.8,            
         color = "black", 
         fontface = "bold",
         check_overlap = TRUE
@@ -99,7 +95,6 @@ plot_map <- function(dataset){
     scale_fill_manual(values = c("#D55E00", "#CC79A7", "#009E73", "#0072B2")) + 
     theme_void() +                                        
     theme(
-      # Draws a crisp bounding box around the zoomed inset map frame
       panel.border = element_rect(color = "gray40", fill = NA, size = 1),
       plot.background = element_rect(fill = "white", color = NA),
       panel.background = element_rect(fill = "white", color = NA),
@@ -107,13 +102,11 @@ plot_map <- function(dataset){
       legend.position = "none" 
     )
 
-  # 3. COMBINE BOTH MAPS INTO ONE LAYOUT
   final_plot <- ggdraw(main_map) +
     draw_plot(inset_map, x = 0.05, y = 0.05, width = 0.38, height = 0.38)
 
-  # 4. SAVE THE COMBINED PLOT
   ggsave(
-    filename = paste0("C:/Users/nan/OneDrive/Documentos/ucr/practica profesiona/dengue-model/results/figures/best_", dataset, "_models_map.png"),
+    filename = paste0(r"(C:\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\2_results\figures\best_)", dataset, "_models_map.png"),
     plot = final_plot,
     width = 10,  
     height = 8,
