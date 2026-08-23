@@ -1,9 +1,5 @@
 """
-This script contains the Model class used to train and evaluate the different models for relative risk. It includes methods for partitioning the data, training the models, calculating variable importance, selecting features with RFECV, calculating prediction intervals, and calculating confidence intervals for the NRMSE metric. The class is designed to be flexible and can be used for different cantons and model types (Random Forest, XGBoost, Hybrid Random Forest, Hybrid XGBoost).
-"""
-
-"""
-This script contains the Model class used to train and evaluate the different models for relative risk. It includes methods for partitioning the data, training the models, calculating variable importance, selecting features with RFECV, calculating prediction intervals, and calculating confidence intervals for the NRMSE metric. The class is designed to be flexible and can be used for different cantons and model types (Random Forest, XGBoost, Hybrid Random Forest, Hybrid XGBoost).
+This script contains the Model class used to train and evaluate the different models for relative risk. It includes methods for partitioning the data, training the models, calculating variable importance, calculating prediction intervals, and calculating confidence intervals for the NRMSE metric. The class is designed to be flexible and can be used for different cantons and model types (Random Forest, XGBoost, Hybrid Random Forest, Hybrid XGBoost).
 """
 
 import pandas as pd
@@ -214,7 +210,7 @@ class Model:
 
         return X_combined, y_combined, X_train, X_test, y_test, test, pds, epsilon
 
-    def serie_temp_canton(self, model_type, X_combined, y_combined, y_test, lower_bound, upper_bound, epsilon, lims = [0, 7], full = False):
+    def serie_temp_canton(self, model_type, X_combined, y_combined, y_test, lower_bound, upper_bound, epsilon, lims = [0, 7]):
 
         """
         Method that plots the time series of actual and predicted relative risk values for the test set, including the confidence intervals for the predictions. It reads the results from the csv file where they were saved after making predictions with the trained model.
@@ -223,19 +219,24 @@ class Model:
         ----
         model_type: str
             the type of model for which to plot the results (options: "rf", "xgb", "hrf", "hxgb")
+        X_combined, y_combined: dataframe, Pandas Series
+            training and validation data
+        y_test: pandas series
+            test relative risk data
         lower_bound: array-like
             array-like with the lower bound of the confidence intervals for the predictions, to be used as the lower limit shaded area around the predicted values in the plot.
         upper_bound: array-like
             array-like with the upper bound of the confidence intervals for the predictions, to be used as the upper limit shaded area around the predicted values in the plot.
+        epsilon: float
+            value used before log-transform
+        lims: list
+            list with the limits for the y-axis of the plot, to be used as the ylim parameter in the plot. 
         Returns
         ----
             Nothing, just shows the plot with the time series of actual and predicted relative risk values for the test set, including the confidence intervals for the predictions.
         """
-        if full:
-            preds = pd.read_csv(f'../data/model_results/results_{model_type}_full.csv')
-            results = preds[preds["week_canton"].str.contains(self.canton)] 
-        else: 
-            results = pd.read_csv(f'../data/model_results/results_{model_type}_{self.canton}.csv')
+        preds = pd.read_csv(f'../data/model_results/results_{model_type}_full.csv')
+        results = preds[preds["week_canton"].str.contains(self.canton)] 
 
         df_copy = self.df.copy()
 
@@ -268,6 +269,19 @@ class Model:
 
     def custom_threshold_score(self, y_true, y_pred_proba, threshold):
 
+        """
+        Scorer used to calculate the permutation importance for the classification part of the hybrid models. It uses a custom threshold to convert predicted probabilities into binary predictions, and then calculates the negative root mean squared error between the true labels and the predicted labels.
+        
+        Parameters
+        ----
+        y_true: Pandas series
+            True labels for the classification task.
+        y_pred_proba: array-like
+            Predicted probabilities for the positive class.
+        threshold: float
+            Threshold to convert predicted probabilities into binary predictions.
+        """
+    
         if y_pred_proba.ndim == 2:
             y_scores = y_pred_proba[:, 1]
         else:
@@ -276,13 +290,13 @@ class Model:
         
         y_pred= (y_scores >= threshold).astype(int)
         
-        return -1 * (root_mean_squared_error(y_true, y_pred)) ** 2
+        return -1 * (root_mean_squared_error(y_true, y_pred)) ** 2 # The neg root mean squared error is used as the scoring metric for the permutation importance, to be consistent with the scoring used in the regression part of the hybrid models.
  
     
-    def var_importance(self, X_test, y_test, model_type, repeats = 100, var = "RR"):
+    def var_importance(self, X_test, y_test, model_type, repeats = 100):
 
         """
-        Method that calculates and plots the permutation importance of the features for the specified model type, using the test set. It reads the trained model from the saved models folder, calculates the permutation importance using the sklearn function, and then creates a horizontal bar plot with the importance scores for the top 10 features.
+        Method that calculates and plots the permutation importance of the features for the specified model type, using the test set. It reads the trained model from the saved models folder, calculates the permutation importance using the sklearn function, and then creates a horizontal bar plot with the importance scores for the top 10 features. If it is a hurdle model, it calculates the permutation importance for both the classification and regression parts of the model, and plots them separately.
 
         Parameters
         ----
@@ -294,13 +308,12 @@ class Model:
             the type of model for which to calculate the variable importance (options: "rf", "xgb", "hrf", "hxgb")
         repeats: int
             the number of times to permute a feature for calculating the permutation importance, to be used as the n_repeats parameter in the sklearn function. 
-        var: str
-            the name of the target variable for which to calculate the variable importance, to be used in the title of the plot. the default value is "RR" for relative risk.
 
         Returns
         ----
             imp_df: dataframe
                 dataframe with the features, their importance scores, and their standard deviation, sorted by importance score in descending order.
+            It also shows the horizontal bar plot with the importance scores for the top 10 features.
         """
         start = time.perf_counter()
 
@@ -355,7 +368,7 @@ class Model:
                     label.set_fontweight('bold')
                 ax.bar_label(ax.containers[0], fmt='%.2e', fontsize = 10, fontweight = "bold")
                 ax.set_xlabel("Importance", fontsize = 20, fontweight = "bold")
-                # fig.suptitle(f"{model_type} classification permutation importance for {var} in {self.canton}")
+                # fig.suptitle(f"{model_type} classification permutation importance for RR in {self.canton}")
                 plt.show()
 
             print("Regressor")
@@ -395,42 +408,45 @@ class Model:
         epsilon,
         alpha=0.05,
         gamma=0.005,
-        n_resamplings=100,
-        full = True
+        n_resamplings=100
     ):
         """
-        Adaptive Conformal Inference (ACI) prediction intervals.
+        This method uses Adaptive Conformal Inference (ACI) to construct prediction intervals.
 
         Parameters
         ----------
-        model : fitted sklearn estimator
-        X_train, y_train : training/calibration data
-        X_test, y_test : test data (y_test is only used for online updating)
-        epsilon : value used before log-transform
-        alpha : miscoverage level (0.05 -> 95% PI)
-        gamma : adaptation rate
-        n_resamplings : number of bootstrap resamples
+        model_type: str
+            the type of model, which can be "rf", "xgb", "hrf", or "hxgb"
+        X_train, y_train: dataframe, Pandas series
+            training data
+        X_test, y_test: dataframe, Pandas series
+            test data (y_test is only used for online updating)
+        epsilon: float
+            value used before log-transform
+        alpha: float
+            miscoverage level (0.05 -> 95% PI)
+        gamma: float 
+            adaptation rate
+        n_resamplings: 
+            number of bootstrap resamples
 
         Returns
         -------
-        y_pred : point predictions
-        lower : lower prediction interval
-        upper : upper prediction interval
+        y_pred: array-like
+            point predictions
+        lower: array-like
+            lower prediction interval
+        upper: array-like
+            upper prediction interval
         """
 
         start = time.perf_counter()
 
-        if full:
-            try:
-                grid = joblib.load(f'../models/saved_models/{model_type}_reg_full.joblib')
-            except: 
-                grid = joblib.load(f'../models/saved_models/{model_type}_full.joblib')
-        else:
-            try:
-                grid = joblib.load(f'../models/saved_models/{model_type}_reg_{self.canton}.joblib')
-            except: 
-                grid = joblib.load(f'../models/saved_models/{model_type}_{self.canton}.joblib')
-
+        try:
+            grid = joblib.load(f'../models/saved_models/{model_type}_reg_full.joblib')
+        except: 
+            grid = joblib.load(f'../models/saved_models/{model_type}_full.joblib')
+        
         best_reg = grid.best_estimator_
 
         X_train = X_train.to_numpy(dtype=np.float32)
@@ -681,7 +697,7 @@ class Model:
         Returns
         ----
             best_threshold: float
-                return the best threshold so that i can be saved to calculate intervals
+                return the best threshold so that it can be saved to calculate intervals
         """
         start = time.perf_counter()
 
@@ -912,6 +928,24 @@ class Model:
         ax.xaxis.set_major_locator(ticker.MultipleLocator(n))
 
     def calculate_train_predictions(self, model_type, X_combined, epsilon): 
+
+        """
+        Method that calculates the predictions for the training set.
+
+        Parameters
+        ----
+        model_type: str
+            model for which the predictions will be calculated (options: "rf", "xgb", "hrf", "hxgb")
+        X_combined: dataframe
+            training and validation data
+        epsilon: float
+            the small value that was added to the relative risk before log-transforming.
+
+        Returns
+        ----
+            predictions: array-like
+                the calculated predictions for the training set
+        """
         # Check if there's a classifier model if it's a hybrid model type
         try:
             grid_classi = joblib.load(f'../models/saved_models/{model_type}_classi_{self.canton}.joblib')
@@ -956,6 +990,26 @@ class Model:
         return predictions
 
     def calculate_train_nrmse(self, model_type, X_combined, y_combined, epsilon):
+        """
+        Method that calculates the NRMSE for the predictions from a model of a certain type, using the training set.
+
+        Parameters
+        ----
+        model_type: str
+            model for which the NRMSE will be calculated (options: "rf", "xgb", "hrf", "hxgb")
+        X_combined, y_combined: dataframe, pandas Series
+            training and validation data (y_combined is log-transformed and with epsilon added)
+        epsilon: float
+            the small value that was added to the relative risk before log-transforming.
+        
+        Returns
+        ----
+            self.canton: str
+                the canton included in the class instance
+
+            nrmse: float
+                the calculated NRMSE
+        """
 
         predictions = self.calculate_train_predictions(self, model_type, X_combined, epsilon)
 
@@ -970,12 +1024,15 @@ class Model:
     def calculate_test_nrmse(self, model_type, epsilon):
 
         """
-        Method that calculates the NRMSE for the predictions from a model of a certain type, using the class instance canton.
+        Method that calculates the NRMSE for the test set predictions from a model of a certain type.
 
         Parameters
         ----
         model_type: str
             model for which the NRMSE will be calculated (options: "rf", "xgb", "hrf", "hxgb")
+
+        epsilon: float
+            the small value that was added to the relative risk before log-transforming.
 
         Returns
         ----
@@ -995,6 +1052,44 @@ class Model:
         return self.canton, nrmse
   
     def confint_nrmse(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, which_set, n_bootstraps = 500):
+
+        """
+        Method that calculates the point estimate NRMSE for the predictions from an individual model of a certain type, using either the training or test set, and calculates a 95% confidence interval for the NRMSE using bootstrapping.
+
+        Parameters
+        ----
+        model_type: str
+            model for which the NRMSE will be calculated (options: "rf", "xgb", "hrf", "hxgb")
+        
+        X_combined, y_combined: dataframe, pandas Series
+            training and validation data
+
+        X_test, y_test: dataframe, pandas Series
+            test data
+        
+        epsilon: float
+            the small value that was added to the relative risk before log-transforming.
+
+        which_set: str
+            indicates which set to use for the NRMSE calculation and bootstrapping ("train" or "test")
+        
+        n_bootstraps: int
+            number of bootstrap resamples to use for the confidence interval calculation
+        
+        Returns
+        ----
+            self.canton: str
+                the canton included in the class instance
+
+            point: float    
+                the point estimate for the NRMSE, calculated by averaging the NRMSEs from the bootstrap resamples
+
+            lower_bound: float
+                the lower bound of the 95% confidence interval for the NRMSE, calculated by taking the 2.5th percentile of the NRMSEs from the bootstrap resamples
+
+            upper_bound: float
+                the upper bound of the 95% confidence interval for the NRMSE, calculated by taking the 97.5th percentile of the NRMSEs from the bootstrap resamples
+        """
 
         start = time.perf_counter()
         # Check if there's a classifier model if it's a hybrid model type
@@ -1038,18 +1133,18 @@ class Model:
 
         if model_type == "hrf":
             if self.canton == "full":
-                thresholds = pd.read_csv("/home/marianne.pena/mainMarianne/dengue-model/data/thresholds/full_threshold_hrf.csv")
+                thresholds = pd.read_csv("../data/model_results/thresholds/full_threshold_hrf.csv")
                 thresholds["canton"] = thresholds["canton"].astype(str)
             else: 
-                thresholds = pd.read_csv("/home/marianne.pena/mainMarianne/dengue-model/data/thresholds/thresholds_hrf.csv")
+                thresholds = pd.read_csv("../data/model_results/thresholds/thresholds/thresholds_hrf.csv")
                 thresholds["canton"] = thresholds["canton"].astype(str)
             best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
         elif model_type == "hxgb":
             if self.canton == "full":
-                thresholds = pd.read_csv("/home/marianne.pena/mainMarianne/dengue-model/data/thresholds/full_threshold_hxgb.csv")
+                thresholds = pd.read_csv("../data/model_results/thresholds/full_threshold_hxgb.csv")
                 thresholds["canton"] = thresholds["canton"].astype(str)
             else: 
-                thresholds = pd.read_csv("/home/marianne.pena/mainMarianne/dengue-model/data/thresholds/thresholds_hxgb.csv")
+                thresholds = pd.read_csv("../data/model_results/thresholds/thresholds_hxgb.csv")
                 thresholds["canton"] = thresholds["canton"].astype(str)
             best_threshold = thresholds[thresholds["canton"] == self.canton]["best_th"].values[0]
 
@@ -1083,6 +1178,35 @@ class Model:
         return self.canton, point, lower_bound, upper_bound
     
     def calculate_nrmse_full(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, which_set):
+
+        """
+        Method that calculates the NRMSE for the predictions from the global model of a certain type, using either the training or test set
+
+        Parameters
+        ----
+        model_type: str
+            model for which the NRMSE will be calculated (options: "rf", "xgb", "hrf", "hxgb")
+        
+        X_combined, y_combined: dataframe, pandas Series
+            training and validation data
+
+        X_test, y_test: dataframe, pandas Series
+            test data
+        
+        epsilon: float
+            the small value that was added to the relative risk before log-transforming.
+
+        which_set: str
+            indicates which set to use for the NRMSE calculation and bootstrapping ("train" or "test")
+
+        Returns
+        ----
+            self.canton: str
+                the canton included in the class instance
+
+            nrmse: float    
+                the point estimate for the NRMSE, using the predictions from our data
+        """
 
         # Check if there's a classifier model if it's a hybrid model type
         try:
@@ -1146,6 +1270,44 @@ class Model:
         return self.canton, nrmse
         
     def confint_nrmse_full(self, model_type, X_combined, y_combined, X_test, y_test, epsilon, which_set, n_bootstraps = 500):
+
+        """
+        Method that calculates the point estimate NRMSE for the predictions from a global model of a certain type, using either the training or test set, and calculates a 95% confidence interval for the NRMSE using bootstrapping.
+
+        Parameters
+        ----
+        model_type: str
+            model for which the NRMSE will be calculated (options: "rf", "xgb", "hrf", "hxgb")
+        
+        X_combined, y_combined: dataframe, pandas Series
+            training and validation data
+
+        X_test, y_test: dataframe, pandas Series
+            test data
+        
+        epsilon: float
+            the small value that was added to the relative risk before log-transforming.
+
+        which_set: str
+            indicates which set to use for the NRMSE calculation and bootstrapping ("train" or "test")
+        
+        n_bootstraps: int
+            number of bootstrap resamples to use for the confidence interval calculation
+        
+        Returns
+        ----
+            self.canton: str
+                the canton included in the class instance
+
+            point: float    
+                the point estimate for the NRMSE, calculated by averaging the NRMSEs from the bootstrap resamples
+
+            lower_bound: float
+                the lower bound of the 95% confidence interval for the NRMSE, calculated by taking the 2.5th percentile of the NRMSEs from the bootstrap resamples
+
+            upper_bound: float
+                the upper bound of the 95% confidence interval for the NRMSE, calculated by taking the 97.5th percentile of the NRMSEs from the bootstrap resamples
+        """
 
         start = time.perf_counter()
 
