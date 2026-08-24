@@ -1,3 +1,4 @@
+This file creates the Costa Rican map that includes the best-performing model types per municipality. It also counts the number of municipalities with each model type as their best-performing one.
 
 ```{r}
 library(dplyr)
@@ -9,7 +10,7 @@ library(scales)
 library(corrgram)
 ```
 ```{r}
-  cantones <- st_read(r"(C:\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\canton-shapes\UGEC_MGN_2022.shp)")
+  cantones <- st_read(r"(..\data\canton-shapes\UGEC_MGN_2022.shp)")
   cantones$COD_UGEC = as.numeric(cantones$COD_UGEC)
   cantones <- st_transform(cantones, 4326)
   
@@ -32,13 +33,23 @@ library(dplyr)
 library(cowplot)
 
 plot_map <- function(dataset){
-  best <- read.csv(paste0("C:/Users/nan/OneDrive/Documentos/ucr/practica profesiona/dengue-model/data/model_results/metrics/best_model_full_confint_", dataset, ".csv"))
+
+  #  Function that plots the best-performing model per municipality. 
+
+  # Parameters
+  #  ----
+  #  dataframe: string
+  #    specification of whether the train or test datasets are used 
+
+  #  Returns
+  #  ----
+  #  Nothing, but it plots the map.
 
   best$best_model = as.factor(best$best_nrmse_model)
   levels(best$best_model) = c("HRF", "HXGB", "RF", "XGB")
   best$canton[which(best$canton == "-202")] = 202
   
-  cantones <- st_read(r"(C:\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\data\canton-shapes\UGEC_MGN_2022.shp)")
+  cantones <- st_read(r"(..\data\canton-shapes\UGEC_MGN_2022.shp)")
   cantones$COD_UGEC = as.numeric(cantones$COD_UGEC)
   cantones <- st_transform(cantones, 4326)
   
@@ -106,7 +117,7 @@ plot_map <- function(dataset){
     draw_plot(inset_map, x = 0.05, y = 0.05, width = 0.38, height = 0.38)
 
   ggsave(
-    filename = paste0(r"(C:\Users\nan\OneDrive\Documentos\ucr\practica profesiona\dengue-model\2_results\figures\best_)", dataset, "_models_map.png"),
+    filename = paste0(r"(..\2_results\figures\best_)", dataset, "_models_map.png"),
     plot = final_plot,
     width = 10,  
     height = 8,
@@ -118,10 +129,10 @@ plot_map <- function(dataset){
 ```{r}
 plot_map("test")
 ```
-Count how many per model
+Count how many municipalities have each model type as their best-performing type.
 
 ```{r}
-best1 <- read.csv(paste0("C:/Users/nan/OneDrive/Documentos/ucr/practica profesiona/dengue-model/data/model_results/metrics/best_model_full_confint_test.csv"))
+best1 <- read.csv(paste0("..data/model_results/metrics/best_model_full_confint_test.csv"))
 ```
 
 ```{r}
