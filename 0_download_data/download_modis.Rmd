@@ -1,13 +1,15 @@
+This file is used to download and save data from the MODIS satellite
+
 ```{r}
 library(dplyr)
 library(MODISTools)
 ```
 ```{r}
-setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw")
+setwd("../data/raw")
 ```
 
 ```{r}
-locations <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/locations_centroids.csv")
+locations <- read.csv("../data/raw/locations_centroids.csv")
 
 locations <- locations |> select(site_name=canton,lat=lat,lon=lon)  
 ```
@@ -48,8 +50,6 @@ baseNDVI2021_full <- mt_batch_subset(df = locations,
 ```{r}
 save(baseNDVI2021_full, file = "baseNDVI2021_full.RData")
 ```
-
-# LST
 
 
 
