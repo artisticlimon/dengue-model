@@ -153,7 +153,7 @@ canton_week <- function(df, var_name) {
 # Population
 
 ```{r}
-pobs = read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/pob_anual.xlsx")
+pobs = read_excel("../data/raw/pob_anual.xlsx")
 ```
 ```{r}
 # Transpose so cantons are the columns and the rows are the years
@@ -179,7 +179,7 @@ pob_int <- interpolate(pobs_t, ymd("2019-06-30"), ymd("2026-06-30"))
 ```
 
 ```{r}
-write.csv(pob_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/pob_int_rr.csv")
+write.csv(pob_int, "../data/pob_int_rr.csv")
 ```
 
 ```{r}
@@ -191,13 +191,13 @@ pob_pivot <- canton_week(pob_int_0, var_name = "pob")
 ```
 
 ```{r}
-write.csv(pob_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/interim/pob_int.csv")
+write.csv(pob_pivot, "..data/interim/pob_int.csv")
 ```
 
 # NDVI
 
 ```{r}
-baseNDVI <- read.csv("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseNDVI.csv")
+baseNDVI <- read.csv("../data/raw/baseNDVI.csv")
 baseNDVI <- baseNDVI |> 
   mutate(fecha = ymd(fecha)) |>
   mutate(ndvi1 = case_when(
@@ -226,7 +226,7 @@ baseNDVI_int_long <- pivot_longer(baseNDVI_int, cols = c(-(week))) |>
 
 ```{r}
 # Use precipitation dataset for spatial imputation because it contains the coordinates for each canton, which are needed for this imputation
-precip <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps/chirps_precip.csv")
+precip <- read.csv(file = "../data/raw/chirps/chirps_precip.csv")
 ```
 
 ```{r}
@@ -246,7 +246,7 @@ precip_weekly_site <- precip |>
 
 ```{r}
 # This is done to change the canton names to its code in the precipitation dataset
-codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+codes <- read_excel("../data/raw/dengue_limpio.xlsx")
 
 codes <- codes |> 
   select(ID, "PROVINCIA Y CANTON") |> 
@@ -328,7 +328,7 @@ baseNDVI_eda <- baseNDVI_int_long_precip |>
 ```
 
 ```{r}
-write.csv(baseNDVI_eda, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/NDVI_eda.csv")
+write.csv(baseNDVI_eda, "../data/raw/NDVI_eda.csv")
 ```
 
 ```{r}
@@ -337,7 +337,7 @@ baseNDVI_pivot <- canton_week(baseNDVI_eda, "ndvi")
 ```
 
 ```{r}
-write.csv(baseNDVI_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/interim/NDVI_int.csv")
+write.csv(baseNDVI_pivot, "../data/interim/NDVI_int.csv")
 ```
 
 # El Niño
@@ -374,7 +374,7 @@ baseSST1 <- baseSST1 |>
 
 ```{r}
 # Convert data to EDA
-write.csv(baseSST1, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/SST_eda.csv")
+write.csv(baseSST1, "../data/raw/SST_eda.csv")
 ```
 
 ```{r}
@@ -383,7 +383,7 @@ baseSST_int <- interpolate_ndvi(baseSST1, first_day = ymd("2020-01-01"), last_da
 
 ```{r}
 # Get canton codes for SST
-codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+codes <- read_excel("../data/raw/dengue_limpio.xlsx")
 
 codes <- codes |> 
   select(ID, "PROVINCIA Y CANTON") |> 
@@ -408,7 +408,7 @@ baseSST_int <- baseSST_int |>
 
 ```{r}
 # Create for EDA
-write.csv(baseSST_int, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/SST_int_eda.csv")
+write.csv(baseSST_int, "../data/raw/SST_int_eda.csv")
 ```
 
 ```{r}
@@ -416,5 +416,5 @@ baseSST_pivot <- canton_week(df = baseSST_int, var_name = "nino34ssta")
 ```
 
 ```{r}
-write.csv(baseSST_pivot, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/interim/SST_int.csv")
+write.csv(baseSST_pivot, "../data/interim/SST_int.csv")
 ```

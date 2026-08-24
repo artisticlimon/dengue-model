@@ -1,4 +1,4 @@
-This file aggregates CHIRPS precipitation data weekly (total, maximum, minimum, median, and mean) and imputes Golfito using IDW.
+This file aggregates CHIRPS precipitation data weekly (total, maximum, minimum, median, and mean) and imputes Golfito using IDW. It also saves data in the desired format for an EDA report.
 
 ```{r}
 library(lubridate)
@@ -28,14 +28,14 @@ para_eda <- function(df, var) {
   df_new <- df |> 
     select(c(week, ID, var)) |>
     pivot_wider(names_from = ID, values_from = var, id_cols = week)
-  write.csv(df_new, file = paste0("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/", var, "_eda.csv"))
+  write.csv(df_new, file = paste0("../data/raw/", var, "_eda.csv"))
 }
 ```
 
 ```{r}
-setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps")
+setwd("../data/raw/chirps")
 
-precip <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirps/chirps_precip.csv")
+precip <- read.csv(file = "../data/raw/chirps/chirps_precip.csv")
 ```
 
 ```{r}
@@ -59,7 +59,7 @@ precip_weekly_site <- precip |>
 
 ```{r}
 # Load file that contains canton names and codes to add canton codes to precipitation database
-codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+codes <- read_excel("../data/raw/dengue_limpio.xlsx")
 
 codes <- codes |> 
   select(ID, "PROVINCIA Y CANTON") |> 
@@ -251,7 +251,7 @@ precip_weekly <- precip_weekly  |>
 ```
 
 ```{r}
-write.csv(precip_weekly, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/precip_weekly.csv")
+write.csv(precip_weekly, file = "../data/clean/precip_weekly.csv")
 ```
 
 

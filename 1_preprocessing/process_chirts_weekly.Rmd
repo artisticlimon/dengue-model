@@ -1,4 +1,4 @@
-This file aggregates CHIRTS min and max temperature data weekly using their means. Then, it imputes Golfito using IDW. Additionally, it creates the average weekly temperature data.
+This file aggregates CHIRTS min and max temperature data weekly using their means. Then, it imputes Golfito using IDW. Additionally, it creates the average weekly temperature data. It also saves data in the desired format for an EDA report.
 
 ```{r}
 library(lubridate)
@@ -28,16 +28,16 @@ para_eda <- function(df, var) {
   df_new <- df |> 
     select(c(week, ID, var)) |>
     pivot_wider(names_from = ID, values_from = var, id_cols = week)
-  write.csv(df_new, file = paste0("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/", var, "_eda.csv"))
+  write.csv(df_new, file = paste0("../data/raw/", var, "_eda.csv"))
 }
 ```
 
 ## Temp max
 
 ```{r}
-setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirts/chirts_max")
+setwd("../data/raw/chirts/chirts_max")
 
-tmax <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirts/chirts_max/chirts_max.csv")
+tmax <- read.csv(file = "../data/raw/chirts/chirts_max/chirts_max.csv")
 ```
 
 ```{r}
@@ -61,7 +61,7 @@ tmax_weekly_site <- tmax |>
 
 ```{r}
 # Load file that contains canton names and codes to add canton codes to tmax database
-codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+codes <- read_excel("../data/raw/dengue_limpio.xlsx")
 
 codes <- codes |> 
   select(ID, "PROVINCIA Y CANTON") |> 
@@ -131,13 +131,13 @@ tmax_weekly = tmax_weekly |>
 ```
 
 ```{r}
-#para_eda(tmax_weekly, "tmax_min")
+# para_eda(tmax_weekly, "tmax_min")
 
-#para_eda(tmax_weekly, "tmax_max")
+# para_eda(tmax_weekly, "tmax_max")
 
 para_eda(tmax_weekly, "tmax_mean")
 
-#para_eda(tmax_weekly, "tmax_median")
+# para_eda(tmax_weekly, "tmax_median")
 ```
 
 ```{r}
@@ -148,15 +148,15 @@ tmax_weekly <- tmax_weekly  |>
 ```
 
 ```{r}
-write.csv(tmax_weekly, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/tmax_weekly.csv")
+write.csv(tmax_weekly, file = "../data/clean/tmax_weekly.csv")
 ```
 
 ## Temp min
 
 ```{r}
-setwd("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirts/chirts_min")
+setwd("../data/raw/chirts/chirts_min")
 
-tmin <- read.csv(file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/chirts/chirts_min/chirts_min.csv")
+tmin <- read.csv(file = "../data/raw/chirts/chirts_min/chirts_min.csv")
 ```
 
 ```{r}
@@ -176,7 +176,7 @@ tmin_weekly_site <- tmin |>
 
 ```{r}
 # Load file that contains canton names and codes to add canton codes to tmax database
-codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+codes <- read_excel("../data/raw/dengue_limpio.xlsx")
 
 codes <- codes |> 
   select(ID, "PROVINCIA Y CANTON") |> 
@@ -252,15 +252,15 @@ tmin_weekly$temp_prom <- (tmax_mean$tmax_mean + tmin_weekly$tmin_mean) / 2
 ```
 
 ```{r}
-#para_eda(tmin_weekly, "tmin_min")
+# para_eda(tmin_weekly, "tmin_min")
 
-#para_eda(tmin_weekly, "tmin_min")
+# para_eda(tmin_weekly, "tmin_min")
 
 para_eda(tmin_weekly, "tmin_mean")
 
 para_eda(tmin_weekly, "temp_prom")
 
-#para_eda(tmin_weekly, "tmin_median")
+# para_eda(tmin_weekly, "tmin_median")
 ```
 
 ```{r}
@@ -278,9 +278,9 @@ temp_prom <- tmin_weekly |>
 ```
 
 ```{r}
-write.csv(tmin_mean, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/tmin_weekly.csv")
+write.csv(tmin_mean, file = "../data/clean/tmin_weekly.csv")
 
-write.csv(temp_prom, file = "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/clean/temp_prom.csv")
+write.csv(temp_prom, file = "../data/clean/temp_prom.csv")
 ```
 
 

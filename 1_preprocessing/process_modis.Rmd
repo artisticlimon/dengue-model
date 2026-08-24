@@ -9,9 +9,9 @@ library(readxl)
 # NDVI 
 
 ```{r}
-load("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseNDVI2020_full.RData")
+load("../data/raw/baseNDVI2020_full.RData")
 
-load("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseNDVI2023_full.RData")
+load("../data/raw/baseNDVI2023_full.RData")
 ```
 
 ```{r}
@@ -31,7 +31,7 @@ baseNDVI_sites
 ```
 ```{r}
 # Change canton names to canton codes
-codes <- read_excel("C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/dengue_limpio.xlsx")
+codes <- read_excel("../data/raw/dengue_limpio.xlsx")
 
 codes <- codes |> 
   select(ID, "PROVINCIA Y CANTON") |> 
@@ -64,5 +64,5 @@ baseNDVI <- baseNDVI |>
 ```
 
 ```{r}
-write.csv(baseNDVI, "C:/Users/nan/OneDrive - Universidad de Costa Rica/cuenta personal/ucr pers/practica profesional/practica dengue/dengue-model/data/raw/baseNDVI.csv")
+write.csv(baseNDVI, "../data/raw/baseNDVI.csv")
 ```
